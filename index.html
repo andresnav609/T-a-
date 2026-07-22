@@ -4,130 +4,223 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Invitación de Boda</title>
-<meta name="description" content="Tienes una invitación especial." />
+<meta name="description" content="Tienes una invitación especial. Toca para abrir." />
 <style>
-  :root {
-    --tinta: #3a3226;
-    --suave: #8a7f6d;
-    --oro: #b08d57;
-    --crema: #f6f1e7;
-    --papel: #fffdf8;
-    --linea: #e3d9c6;
+  :root{
+    /* Escena nocturna */
+    --noche-1:#20302a; --noche-2:#131e1a;
+    /* Papel del sobre y la carta */
+    --marfil:#f3ead6; --marfil-2:#e7dcc2; --papel:#fbf7ef;
+    /* Tinta y acentos */
+    --tinta:#2f342c; --suave:#7f8471; --oro:#b3924f; --oro-claro:#d8bd82; --vino:#7a2e39;
+    --linea:#e0d6bf;
+    --serif:"Palatino Linotype","Book Antiqua",Palatino,"Iowan Old Style",Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    font-family: Georgia, 'Times New Roman', serif;
-    color: var(--tinta);
-    background: var(--crema);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-  .lienzo {
-    max-width: 620px;
-    margin: 0 auto;
-    background: var(--papel);
-    min-height: 100vh;
-    box-shadow: 0 0 60px rgba(0,0,0,.06);
-  }
-  section { padding: 56px 28px; text-align: center; }
-  .divisor { color: var(--oro); font-size: 20px; letter-spacing: 6px; margin: 22px 0; }
-  .etiqueta { text-transform: uppercase; letter-spacing: 3px; font-size: 12px; color: var(--suave); }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{font-family:var(--serif);color:var(--tinta);background:var(--noche-2);overflow:hidden;}
+  body.abierto{overflow:auto;}
+  .etiqueta{font-family:var(--sans);text-transform:uppercase;letter-spacing:.28em;font-size:11px;color:var(--suave);}
 
-  /* Portada */
-  .portada {
-    background: linear-gradient(180deg, #efe6d4 0%, var(--papel) 100%);
-    padding-top: 64px; padding-bottom: 48px;
+  /* ======================= ESCENA / SOBRE ======================= */
+  .escena{
+    position:fixed; inset:0; z-index:50;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(120% 90% at 50% 30%, var(--noche-1), var(--noche-2) 75%);
+    transition:opacity 1s ease;
   }
-  .invita { font-style: italic; color: var(--suave); font-size: 15px; margin-bottom: 10px; }
-  .saludo {
-    font-size: clamp(30px, 9vw, 46px);
-    color: var(--oro);
-    margin: 4px 0 6px;
-    font-weight: normal;
-  }
-  .saludo-sub { font-style: italic; color: var(--suave); font-size: 16px; }
-  .novios {
-    font-size: clamp(38px, 12vw, 66px);
-    line-height: 1.15;
-    margin: 26px 0 8px;
-    font-weight: normal;
-  }
-  .y { display: block; color: var(--oro); font-style: italic; font-size: 26px; margin: 6px 0; }
-  .fecha-portada { letter-spacing: 2px; font-size: 15px; color: var(--tinta); margin-top: 14px; }
+  .escena.fuera{opacity:0; pointer-events:none;}
+  #petalos{position:absolute; inset:0; width:100%; height:100%;}
+  .marco-oro{position:absolute; inset:16px; border:1px solid rgba(216,189,130,.25); border-radius:4px; pointer-events:none;}
 
-  /* Cuenta regresiva */
-  .reloj { display: flex; justify-content: center; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
-  .caja {
-    background: var(--crema);
-    border: 1px solid var(--linea);
-    border-radius: 10px;
-    min-width: 68px; padding: 12px 8px;
+  .sobre-wrap{position:relative; perspective:1400px; z-index:2; text-align:center;}
+  .sobre{
+    position:relative;
+    width:min(86vw,360px); height:calc(min(86vw,360px)*.64);
+    margin:0 auto;
+    transform-style:preserve-3d;
+    filter:drop-shadow(0 26px 40px rgba(0,0,0,.5));
   }
-  .caja b { display: block; font-size: 26px; color: var(--oro); }
-  .caja span { font-size: 11px; letter-spacing: 1px; color: var(--suave); text-transform: uppercase; }
-
-  .frase { font-style: italic; color: var(--suave); font-size: 17px; max-width: 440px; margin: 0 auto; }
-
-  /* Bloques de info */
-  .bloque + .bloque { border-top: 1px solid var(--linea); }
-  .titulo { font-size: 26px; color: var(--oro); margin-bottom: 4px; font-weight: normal; }
-  .dato { font-size: 18px; margin-top: 8px; }
-  .dato small { display: block; color: var(--suave); font-size: 14px; margin-top: 2px; }
-  .boton {
-    display: inline-block; margin-top: 16px;
-    border: 1px solid var(--oro); color: var(--oro);
-    padding: 10px 22px; border-radius: 30px;
-    text-decoration: none; font-size: 14px; letter-spacing: 1px;
-    transition: .2s;
+  /* Fondo del sobre */
+  .fondo{position:absolute; inset:0; z-index:1; border-radius:8px;
+    background:linear-gradient(150deg,var(--marfil) 0%,var(--marfil-2) 100%);}
+  /* La carta que sube */
+  .carta{
+    position:absolute; left:6%; right:6%; top:5%; height:120%; z-index:2;
+    background:linear-gradient(180deg,#fffdf8,var(--papel));
+    border-radius:6px 6px 3px 3px;
+    box-shadow:0 6px 14px rgba(0,0,0,.12);
+    transform:translateY(6%);
+    transition:transform 1s cubic-bezier(.2,.8,.25,1);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding:14% 10% 0; cursor:default;
   }
-  .boton:hover { background: var(--oro); color: #fff; }
+  .carta .mono{width:56px;height:56px;border:1px solid var(--oro);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;color:var(--oro);
+    font-size:20px;letter-spacing:1px;margin-bottom:10px;}
+  .carta .leer{font-family:var(--sans);font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--vino);opacity:0;transition:opacity .5s .3s;}
+  /* Frente del sobre (bolsillo con V) */
+  .frente{position:absolute; inset:0; z-index:3;
+    background:linear-gradient(155deg,var(--marfil-2),var(--marfil));
+    clip-path:polygon(0 8%,50% 52%,100% 8%,100% 100%,0 100%);
+    border-radius:8px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.4);}
+  .destinatario{position:absolute; z-index:5; left:0; right:0; bottom:16%;
+    text-align:center; pointer-events:none;}
+  .destinatario small{display:block;font-family:var(--sans);letter-spacing:.24em;
+    text-transform:uppercase;font-size:9px;color:var(--suave);margin-bottom:3px;}
+  .destinatario b{font-family:var(--serif);font-style:italic;font-weight:normal;
+    font-size:19px;color:var(--tinta);}
+  /* Solapa */
+  .solapa{position:absolute; top:0; left:0; width:100%; height:64%; z-index:6;
+    transform-origin:top center; transform:rotateX(0deg);
+    clip-path:polygon(0 0,100% 0,50% 100%);
+    background:linear-gradient(175deg,var(--marfil) 0%,#ddd0b4 100%);
+    transition:transform 1s cubic-bezier(.5,0,.3,1);}
+  /* Sello de cera */
+  .sello{position:absolute; z-index:8; left:50%; top:46%; transform:translate(-50%,-50%);
+    width:74px; height:74px; border-radius:50%; border:none; cursor:pointer;
+    background:radial-gradient(circle at 35% 30%,#a4414c,var(--vino) 70%);
+    color:var(--oro-claro); font-family:var(--serif); font-size:22px; letter-spacing:1px;
+    box-shadow:0 6px 14px rgba(0,0,0,.4), inset 0 0 0 3px rgba(216,189,130,.35);
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .6s ease, opacity .6s ease;
+    animation:latido 2.6s ease-in-out infinite;}
+  .sello::after{content:""; position:absolute; inset:6px; border-radius:50%;
+    border:1px dashed rgba(216,189,130,.45);}
+  @keyframes latido{0%,100%{box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 0 rgba(216,189,130,.35),inset 0 0 0 3px rgba(216,189,130,.35);}
+    50%{box-shadow:0 6px 14px rgba(0,0,0,.4),0 0 0 12px rgba(216,189,130,0),inset 0 0 0 3px rgba(216,189,130,.35);}}
 
-  /* RSVP */
-  .rsvp { background: var(--tinta); color: var(--crema); }
-  .rsvp .titulo { color: #e9c789; }
-  .rsvp .frase { color: #cfc4ad; }
-  .boton-wa {
-    display: inline-block; margin-top: 20px;
-    background: #25D366; color: #fff;
-    padding: 15px 34px; border-radius: 30px;
-    text-decoration: none; font-weight: bold; font-size: 16px;
-    box-shadow: 0 6px 20px rgba(37,211,102,.35);
+  .hint{margin-top:34px; color:var(--oro-claro); font-style:italic; font-size:16px;
+    letter-spacing:.02em; transition:opacity .5s;}
+  .titular-escena{color:var(--marfil); font-size:13px; letter-spacing:.34em;
+    text-transform:uppercase; margin-bottom:30px; font-family:var(--sans); opacity:.85;}
+
+  /* Estado abriendo */
+  .abriendo .sello{transform:translate(-50%,-50%) scale(.4) rotate(-24deg); opacity:0; animation:none;}
+  .abriendo .solapa{transform:rotateX(178deg);}
+  .abriendo .carta{transform:translateY(-58%);}
+  .abriendo .carta .leer{opacity:1;}
+  .abriendo .hint{opacity:0;}
+
+  /* ======================= INVITACIÓN ======================= */
+  .lienzo{max-width:640px; margin:0 auto; background:var(--papel);
+    min-height:100vh; position:relative;
+    box-shadow:0 0 80px rgba(0,0,0,.12);}
+  .lienzo::before{content:""; position:absolute; inset:12px; border:1px solid var(--linea);
+    pointer-events:none;}
+  .lienzo::after{content:""; position:absolute; inset:16px; border:1px solid rgba(179,146,79,.25);
+    pointer-events:none;}
+  section{padding:60px 30px; text-align:center; position:relative;}
+  .rev{opacity:0; transform:translateY(24px);}
+  .abierto .rev{animation:subir .9s ease forwards;}
+
+  .sprig{color:var(--oro); display:block; margin:18px auto; opacity:.9;}
+  .monograma{width:78px;height:78px;border:1px solid var(--oro);border-radius:50%;
+    margin:0 auto 6px; display:flex;align-items:center;justify-content:center;
+    color:var(--oro); font-size:26px; letter-spacing:1px;}
+
+  .invita{font-style:italic; color:var(--suave); font-size:15px;}
+  .saludo{font-size:clamp(30px,9vw,48px); color:var(--oro); margin:4px 0; font-weight:normal;}
+  .saludo-sub{font-style:italic; color:var(--suave); font-size:15px;}
+  .novios{font-size:clamp(40px,13vw,72px); line-height:1.12; margin:22px 0 8px; font-weight:normal;}
+  .y{display:block; color:var(--oro); font-style:italic; font-size:26px; margin:4px 0;}
+  .fecha-portada{letter-spacing:.14em; font-size:15px; margin-top:12px;}
+
+  .reloj{display:flex; justify-content:center; gap:12px; flex-wrap:wrap; margin-top:10px;}
+  .caja{background:#fff; border:1px solid var(--linea); border-radius:10px; min-width:66px; padding:12px 8px;}
+  .caja b{display:block; font-size:26px; color:var(--oro); font-variant-numeric:tabular-nums;}
+  .caja span{font-family:var(--sans); font-size:10px; letter-spacing:.14em; color:var(--suave); text-transform:uppercase;}
+
+  .frase{font-style:italic; color:var(--suave); font-size:18px; max-width:460px; margin:0 auto; line-height:1.7;}
+  .bloque+.bloque{border-top:1px solid var(--linea);}
+  .titulo{font-size:27px; color:var(--oro); font-weight:normal; margin-bottom:2px;}
+  .dato{font-size:18px; margin-top:8px;}
+  .dato small{display:block; color:var(--suave); font-size:14px; margin-top:2px;}
+  .boton{display:inline-block; margin-top:16px; border:1px solid var(--oro); color:var(--oro);
+    padding:10px 24px; border-radius:30px; text-decoration:none; font-family:var(--sans);
+    font-size:13px; letter-spacing:.08em; transition:.2s;}
+  .boton:hover,.boton:focus-visible{background:var(--oro); color:#fff;}
+
+  .rsvp{background:var(--noche-1); color:var(--marfil);}
+  .rsvp .titulo{color:var(--oro-claro);}
+  .rsvp .frase{color:#cdcbb6;}
+  .rsvp .sprig{color:var(--oro-claro);}
+  .boton-wa{display:inline-block; margin-top:22px; background:#25D366; color:#fff;
+    padding:15px 34px; border-radius:30px; text-decoration:none; font-weight:bold; font-size:16px;
+    font-family:var(--sans); box-shadow:0 8px 22px rgba(37,211,102,.35);}
+  .limite{margin-top:16px; font-size:13px; color:#cdcbb6; font-family:var(--sans);}
+  footer{padding:38px 20px 52px; text-align:center; color:var(--suave); font-size:14px;}
+
+  @keyframes subir{to{opacity:1; transform:translateY(0);}}
+  .rev:nth-child(2){animation-delay:.08s}
+  .rev:nth-child(3){animation-delay:.16s}
+  .rev:nth-child(4){animation-delay:.24s}
+
+  a:focus-visible,button:focus-visible{outline:2px solid var(--oro); outline-offset:3px;}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important; transition:opacity .3s!important;}
+    .rev{opacity:1; transform:none;}
+    .sello{animation:none;}
   }
-  .limite { margin-top: 16px; font-size: 13px; color: #cfc4ad; }
-
-  footer { padding: 34px 20px 46px; text-align: center; color: var(--suave); font-size: 13px; }
-  footer .corazon { color: var(--oro); font-size: 18px; }
 </style>
 </head>
 <body>
-  <div class="lienzo">
 
-    <!-- PORTADA -->
-    <section class="portada">
+  <!-- ====== ESCENA DE APERTURA ====== -->
+  <div class="escena" id="escena" role="dialog" aria-label="Sobre de la invitación">
+    <canvas id="petalos" aria-hidden="true"></canvas>
+    <div class="marco-oro"></div>
+    <p class="titular-escena" id="titularEscena">Tienes una invitación</p>
+    <div class="sobre-wrap">
+      <div class="sobre" id="sobre">
+        <div class="fondo"></div>
+        <div class="carta" id="cartaMini">
+          <div class="mono" id="monoMini">A&nbsp;M</div>
+          <p class="leer">Toca para leer →</p>
+        </div>
+        <div class="frente"></div>
+        <div class="destinatario">
+          <small>Para</small>
+          <b id="destinatario">nuestro invitado especial</b>
+        </div>
+        <div class="solapa"></div>
+        <button class="sello" id="sello" aria-label="Romper el sello y abrir">A&amp;M</button>
+      </div>
+    </div>
+    <p class="hint" id="hint">Toca el sello para abrir</p>
+  </div>
+
+  <!-- ====== INVITACIÓN ====== -->
+  <main class="lienzo" id="lienzo" aria-hidden="true">
+
+    <section class="rev">
+      <div class="monograma" id="monograma">A&nbsp;M</div>
       <p class="invita">Con mucho cariño te invitamos</p>
       <p class="saludo" id="saludo">¡Hola!</p>
       <p class="saludo-sub" id="pases"></p>
-      <div class="divisor">✦ ❦ ✦</div>
-      <h1 class="novios"><span id="p1">María</span><span class="y">&</span><span id="p2">Andrés</span></h1>
+      <svg class="sprig" width="120" height="20" viewBox="0 0 120 20" fill="none" aria-hidden="true">
+        <path d="M10 10h38M110 10H72" stroke="currentColor"/><path d="M60 4c4 2 6 4 6 6s-2 4-6 6c-4-2-6-4-6-6s2-4 6-6Z" fill="currentColor"/>
+        <path d="M50 10c-3-3-7-4-11-3M70 10c3-3 7-4 11-3" stroke="currentColor"/>
+      </svg>
+      <h1 class="novios"><span id="p1">María</span><span class="y">&amp;</span><span id="p2">Andrés</span></h1>
       <p class="etiqueta">Nos casamos</p>
       <p class="fecha-portada" id="fechaPortada">—</p>
     </section>
 
-    <!-- CUENTA REGRESIVA -->
-    <section>
+    <section class="rev">
       <p class="etiqueta">Faltan</p>
       <div class="reloj" id="reloj"></div>
     </section>
 
-    <!-- FRASE -->
-    <section>
-      <div class="divisor">❦</div>
+    <section class="rev">
       <p class="frase" id="frase"></p>
     </section>
 
-    <!-- CEREMONIA -->
-    <section class="bloque">
+    <section class="bloque rev">
       <p class="etiqueta">Ceremonia religiosa</p>
       <h2 class="titulo" id="cerLugar">—</h2>
       <p class="dato" id="cerHora">—</p>
@@ -135,8 +228,7 @@
       <a class="boton" id="cerMapa" target="_blank" rel="noopener">Ver en el mapa</a>
     </section>
 
-    <!-- RECEPCIÓN -->
-    <section class="bloque">
+    <section class="bloque rev">
       <p class="etiqueta">Recepción</p>
       <h2 class="titulo" id="recLugar">—</h2>
       <p class="dato" id="recHora">—</p>
@@ -144,105 +236,145 @@
       <a class="boton" id="recMapa" target="_blank" rel="noopener">Ver en el mapa</a>
     </section>
 
-    <!-- VESTIMENTA -->
-    <section class="bloque">
+    <section class="bloque rev">
       <p class="etiqueta">Código de vestimenta</p>
       <h2 class="titulo" id="vest">—</h2>
     </section>
 
-    <!-- RSVP -->
-    <section class="rsvp">
+    <section class="rsvp rev">
+      <svg class="sprig" width="60" height="18" viewBox="0 0 60 18" fill="none" aria-hidden="true">
+        <path d="M30 2c4 3 6 5 6 7s-2 4-6 7c-4-3-6-5-6-7s2-4 6-7Z" fill="currentColor"/>
+      </svg>
       <h2 class="titulo">Confirma tu asistencia</h2>
-      <p class="frase">Tu presencia es muy importante para nosotros. Por favor confírmanos si podrás acompañarnos.</p>
+      <p class="frase">Tu presencia es lo más importante para nosotros. Por favor confírmanos si podrás acompañarnos.</p>
       <a class="boton-wa" id="botonWA" target="_blank" rel="noopener">Confirmar por WhatsApp</a>
       <p class="limite" id="limite"></p>
     </section>
 
     <footer>
-      <p class="corazon">❦</p>
-      <p id="pieNovios">María & Andrés</p>
+      <svg class="sprig" width="90" height="18" viewBox="0 0 90 18" fill="none" aria-hidden="true">
+        <path d="M8 9h30M82 9H52" stroke="#b3924f"/><path d="M45 3c3 2 5 4 5 6s-2 4-5 6c-3-2-5-4-5-6s2-4 5-6Z" fill="#b3924f"/>
+      </svg>
+      <p id="pieNovios">María &amp; Andrés</p>
     </footer>
 
-  </div>
+  </main>
 
 <script src="config.js"></script>
 <script>
-  (function () {
-    var B = window.BODA || {};
+(function(){
+  // Valores por defecto (genéricos) — se sobrescriben con config.js
+  var DEF = {
+    novia:"María", novio:"Andrés",
+    fechaISO:"2026-12-05T17:00:00", fechaTexto:"Sábado 5 de diciembre de 2026", hora:"5:00 pm",
+    ceremoniaLugar:"Parroquia San José", ceremoniaDireccion:"Av. Principal 123, Ciudad",
+    ceremoniaMapa:"https://maps.google.com/?q=Parroquia+San+Jose",
+    recepcionLugar:"Salón Jardín Las Flores", recepcionDireccion:"Calle del Sol 456, Ciudad",
+    recepcionHora:"7:00 pm", recepcionMapa:"https://maps.google.com/?q=Salon+Jardin+Las+Flores",
+    vestimenta:"Formal / Etiqueta",
+    frase:"Con la bendición de Dios y de nuestros padres, queremos compartir contigo este día tan especial.",
+    whatsappRSVP:"5210000000000", limiteRSVP:"1 de noviembre de 2026"
+  };
+  var B = Object.assign({}, DEF, window.BODA || {});
+  var novios = (B.novia||"") + " & " + (B.novio||"");
+  var iniciales = ((B.novia||" ")[0] + " & " + (B.novio||" ")[0]).toUpperCase();
 
-    // --- Leer nombre del invitado desde el enlace ---
-    var params = new URLSearchParams(location.search);
-    function get(k){ return (params.get(k) || "").trim(); }
-    var invitado = get("invitado") || get("para") || get("guest") || get("to") || get("nombre");
-    var pases = get("pases") || get("pax");
+  // --- Nombre del invitado desde el enlace ---
+  var params = new URLSearchParams(location.search);
+  function get(k){ return (params.get(k)||"").trim(); }
+  var invitadoRaw = get("invitado")||get("para")||get("guest")||get("to")||get("nombre");
+  var invitado = invitadoRaw ? decodeURIComponent(invitadoRaw) : "";
+  var pases = get("pases")||get("pax");
 
-    // Título del navegador
-    var tituloBase = (B.novia || "") + " & " + (B.novio || "");
+  function T(id,v){ var e=document.getElementById(id); if(e&&v!=null) e.textContent=v; }
+  function L(id,v){ var e=document.getElementById(id); if(e&&v) e.href=v; }
 
-    if (invitado) {
-      var nombre = decodeURIComponent(invitado);
-      document.getElementById("saludo").textContent = nombre;
-      document.title = "Invitación · " + nombre;
-    } else {
-      document.getElementById("saludo").textContent = "Estás invitado";
-      document.title = "Invitación · " + tituloBase;
-    }
+  // Escena
+  document.getElementById("monoMini").innerHTML = iniciales;
+  document.getElementById("monograma").innerHTML = iniciales;
+  document.getElementById("sello").textContent = (B.novia||" ")[0] + "&" + (B.novio||" ")[0];
+  if(invitado){ T("destinatario", invitado); document.title = "Invitación · " + invitado; }
+  else { T("destinatario","nuestro invitado especial"); document.title = "Invitación · " + novios; }
 
-    if (pases) {
-      var n = parseInt(pases, 10);
-      if (!isNaN(n) && n > 0) {
-        document.getElementById("pases").textContent =
-          n === 1 ? "Reservamos 1 lugar para ti" : "Reservamos " + n + " lugares para ti";
+  // Invitación
+  T("saludo", invitado || "Estás invitado");
+  if(pases){ var n=parseInt(pases,10); if(!isNaN(n)&&n>0)
+    T("pases", n===1 ? "Reservamos 1 lugar para ti" : "Reservamos "+n+" lugares para ti"); }
+  T("p1",B.novia); T("p2",B.novio); T("fechaPortada",B.fechaTexto); T("frase",B.frase);
+  T("cerLugar",B.ceremoniaLugar); T("cerHora",B.hora); T("cerDir",B.ceremoniaDireccion); L("cerMapa",B.ceremoniaMapa);
+  T("recLugar",B.recepcionLugar); T("recHora",B.recepcionHora); T("recDir",B.recepcionDireccion); L("recMapa",B.recepcionMapa);
+  T("vest",B.vestimenta); T("pieNovios",novios);
+  if(B.limiteRSVP) T("limite","Fecha límite para confirmar: "+B.limiteRSVP);
+
+  var msg = "¡Hola! Confirmo mi asistencia a la boda de "+novios+(invitado?". Soy "+invitado:"")+". ✨";
+  L("botonWA","https://wa.me/"+(B.whatsappRSVP||"")+"?text="+encodeURIComponent(msg));
+
+  // --- Cuenta regresiva ---
+  var reloj=document.getElementById("reloj");
+  var destino=B.fechaISO?new Date(B.fechaISO).getTime():null;
+  function caja(v,l){return '<div class="caja"><b>'+v+'</b><span>'+l+'</span></div>';}
+  function pinta(){
+    if(!destino||!reloj) return;
+    var f=destino-Date.now();
+    if(f<=0){ reloj.innerHTML='<div class="caja"><b>¡Hoy!</b><span>Es el gran día</span></div>'; return; }
+    var d=Math.floor(f/864e5),h=Math.floor(f%864e5/36e5),m=Math.floor(f%36e5/6e4),s=Math.floor(f%6e4/1e3);
+    reloj.innerHTML=caja(d,"Días")+caja(h,"Horas")+caja(m,"Minutos")+caja(s,"Segundos");
+  }
+  pinta(); setInterval(pinta,1000);
+
+  // --- Apertura del sobre ---
+  var escena=document.getElementById("escena"),
+      sobre=document.getElementById("sobre"),
+      sello=document.getElementById("sello"),
+      carta=document.getElementById("cartaMini"),
+      lienzo=document.getElementById("lienzo");
+  var abierto=false;
+
+  function revelar(){
+    if(abierto) return; abierto=true;
+    escena.classList.add("fuera");
+    document.body.classList.add("abierto");
+    lienzo.setAttribute("aria-hidden","false");
+    setTimeout(function(){ escena.style.display="none"; }, 1100);
+  }
+  function abrirSobre(){
+    if(sobre.classList.contains("abriendo")){ revelar(); return; }
+    sobre.classList.add("abriendo");
+  }
+  sello.addEventListener("click", abrirSobre);
+  carta.addEventListener("click", function(){ if(sobre.classList.contains("abriendo")) revelar(); });
+
+  // Movimiento reducido: botón directo
+  if(window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches){
+    sello.textContent="Abrir";
+    sello.addEventListener("click", function(){ setTimeout(revelar,150); });
+  }
+
+  // --- Pétalos cayendo (canvas) ---
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  if(!reduce){
+    var cv=document.getElementById("petalos"), cx=cv.getContext("2d"), W,H,P=[];
+    function tam(){ W=cv.width=cv.offsetWidth; H=cv.height=cv.offsetHeight; }
+    tam(); addEventListener("resize", tam);
+    var cols=["rgba(216,189,130,","rgba(243,234,214,","rgba(164,65,76,"];
+    for(var i=0;i<26;i++){ P.push({
+      x:Math.random()*W, y:Math.random()*H, r:2+Math.random()*4,
+      v:.3+Math.random()*.8, a:Math.random()*Math.PI*2, sw:.4+Math.random()*.8,
+      o:.25+Math.random()*.4, c:cols[i%3] }); }
+    var t=0;
+    (function loop(){
+      if(abierto){ return; }
+      t+=0.02; cx.clearRect(0,0,W,H);
+      for(var i=0;i<P.length;i++){ var p=P[i];
+        p.y+=p.v; p.x+=Math.sin(t+p.a)*p.sw;
+        if(p.y>H+8){ p.y=-8; p.x=Math.random()*W; }
+        cx.beginPath(); cx.ellipse(p.x,p.y,p.r,p.r*1.7,p.a,0,7);
+        cx.fillStyle=p.c+p.o+")"; cx.fill();
       }
-    }
-
-    // --- Rellenar datos de la boda ---
-    function set(id, val){ var el = document.getElementById(id); if (el && val) el.textContent = val; }
-    function link(id, url){ var el = document.getElementById(id); if (el && url) el.href = url; }
-
-    set("p1", B.novia);
-    set("p2", B.novio);
-    set("fechaPortada", B.fechaTexto);
-    set("frase", B.frase);
-    set("cerLugar", B.ceremoniaLugar);
-    set("cerHora", B.hora);
-    set("cerDir", B.ceremoniaDireccion);
-    link("cerMapa", B.ceremoniaMapa);
-    set("recLugar", B.recepcionLugar);
-    set("recHora", B.recepcionHora);
-    set("recDir", B.recepcionDireccion);
-    link("recMapa", B.recepcionMapa);
-    set("vest", B.vestimenta);
-    set("pieNovios", tituloBase);
-    if (B.limiteRSVP) document.getElementById("limite").textContent = "Fecha límite para confirmar: " + B.limiteRSVP;
-
-    // --- Botón de WhatsApp con nombre incluido ---
-    var quien = invitado ? decodeURIComponent(invitado) : "";
-    var msg = "¡Hola! Confirmo mi asistencia a la boda de " + tituloBase +
-              (quien ? ". Soy " + quien : "") + ". ✨";
-    var wa = "https://wa.me/" + (B.whatsappRSVP || "") + "?text=" + encodeURIComponent(msg);
-    document.getElementById("botonWA").href = wa;
-
-    // --- Cuenta regresiva ---
-    var reloj = document.getElementById("reloj");
-    var destino = B.fechaISO ? new Date(B.fechaISO).getTime() : null;
-    function pinta(){
-      if (!destino) return;
-      var falta = destino - Date.now();
-      if (falta <= 0) {
-        reloj.innerHTML = '<div class="caja"><b>¡Hoy!</b><span>Es el gran día</span></div>';
-        return;
-      }
-      var d = Math.floor(falta / 86400000);
-      var h = Math.floor(falta % 86400000 / 3600000);
-      var m = Math.floor(falta % 3600000 / 60000);
-      var s = Math.floor(falta % 60000 / 1000);
-      reloj.innerHTML =
-        caja(d,"Días") + caja(h,"Horas") + caja(m,"Minutos") + caja(s,"Segundos");
-    }
-    function caja(v,l){ return '<div class="caja"><b>'+v+'</b><span>'+l+'</span></div>'; }
-    pinta(); setInterval(pinta, 1000);
-  })();
+      requestAnimationFrame(loop);
+    })();
+  }
+})();
 </script>
 </body>
 </html>
