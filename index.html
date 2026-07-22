@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Invitación de Boda</title>
+<meta name="description" content="Tienes una invitación especial." />
+<style>
+  :root {
+    --tinta: #3a3226;
+    --suave: #8a7f6d;
+    --oro: #b08d57;
+    --crema: #f6f1e7;
+    --papel: #fffdf8;
+    --linea: #e3d9c6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--tinta);
+    background: var(--crema);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .lienzo {
+    max-width: 620px;
+    margin: 0 auto;
+    background: var(--papel);
+    min-height: 100vh;
+    box-shadow: 0 0 60px rgba(0,0,0,.06);
+  }
+  section { padding: 56px 28px; text-align: center; }
+  .divisor { color: var(--oro); font-size: 20px; letter-spacing: 6px; margin: 22px 0; }
+  .etiqueta { text-transform: uppercase; letter-spacing: 3px; font-size: 12px; color: var(--suave); }
+
+  /* Portada */
+  .portada {
+    background: linear-gradient(180deg, #efe6d4 0%, var(--papel) 100%);
+    padding-top: 64px; padding-bottom: 48px;
+  }
+  .invita { font-style: italic; color: var(--suave); font-size: 15px; margin-bottom: 10px; }
+  .saludo {
+    font-size: clamp(30px, 9vw, 46px);
+    color: var(--oro);
+    margin: 4px 0 6px;
+    font-weight: normal;
+  }
+  .saludo-sub { font-style: italic; color: var(--suave); font-size: 16px; }
+  .novios {
+    font-size: clamp(38px, 12vw, 66px);
+    line-height: 1.15;
+    margin: 26px 0 8px;
+    font-weight: normal;
+  }
+  .y { display: block; color: var(--oro); font-style: italic; font-size: 26px; margin: 6px 0; }
+  .fecha-portada { letter-spacing: 2px; font-size: 15px; color: var(--tinta); margin-top: 14px; }
+
+  /* Cuenta regresiva */
+  .reloj { display: flex; justify-content: center; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+  .caja {
+    background: var(--crema);
+    border: 1px solid var(--linea);
+    border-radius: 10px;
+    min-width: 68px; padding: 12px 8px;
+  }
+  .caja b { display: block; font-size: 26px; color: var(--oro); }
+  .caja span { font-size: 11px; letter-spacing: 1px; color: var(--suave); text-transform: uppercase; }
+
+  .frase { font-style: italic; color: var(--suave); font-size: 17px; max-width: 440px; margin: 0 auto; }
+
+  /* Bloques de info */
+  .bloque + .bloque { border-top: 1px solid var(--linea); }
+  .titulo { font-size: 26px; color: var(--oro); margin-bottom: 4px; font-weight: normal; }
+  .dato { font-size: 18px; margin-top: 8px; }
+  .dato small { display: block; color: var(--suave); font-size: 14px; margin-top: 2px; }
+  .boton {
+    display: inline-block; margin-top: 16px;
+    border: 1px solid var(--oro); color: var(--oro);
+    padding: 10px 22px; border-radius: 30px;
+    text-decoration: none; font-size: 14px; letter-spacing: 1px;
+    transition: .2s;
+  }
+  .boton:hover { background: var(--oro); color: #fff; }
+
+  /* RSVP */
+  .rsvp { background: var(--tinta); color: var(--crema); }
+  .rsvp .titulo { color: #e9c789; }
+  .rsvp .frase { color: #cfc4ad; }
+  .boton-wa {
+    display: inline-block; margin-top: 20px;
+    background: #25D366; color: #fff;
+    padding: 15px 34px; border-radius: 30px;
+    text-decoration: none; font-weight: bold; font-size: 16px;
+    box-shadow: 0 6px 20px rgba(37,211,102,.35);
+  }
+  .limite { margin-top: 16px; font-size: 13px; color: #cfc4ad; }
+
+  footer { padding: 34px 20px 46px; text-align: center; color: var(--suave); font-size: 13px; }
+  footer .corazon { color: var(--oro); font-size: 18px; }
+</style>
+</head>
+<body>
+  <div class="lienzo">
+
+    <!-- PORTADA -->
+    <section class="portada">
+      <p class="invita">Con mucho cariño te invitamos</p>
+      <p class="saludo" id="saludo">¡Hola!</p>
+      <p class="saludo-sub" id="pases"></p>
+      <div class="divisor">✦ ❦ ✦</div>
+      <h1 class="novios"><span id="p1">María</span><span class="y">&</span><span id="p2">Andrés</span></h1>
+      <p class="etiqueta">Nos casamos</p>
+      <p class="fecha-portada" id="fechaPortada">—</p>
+    </section>
+
+    <!-- CUENTA REGRESIVA -->
+    <section>
+      <p class="etiqueta">Faltan</p>
+      <div class="reloj" id="reloj"></div>
+    </section>
+
+    <!-- FRASE -->
+    <section>
+      <div class="divisor">❦</div>
+      <p class="frase" id="frase"></p>
+    </section>
+
+    <!-- CEREMONIA -->
+    <section class="bloque">
+      <p class="etiqueta">Ceremonia religiosa</p>
+      <h2 class="titulo" id="cerLugar">—</h2>
+      <p class="dato" id="cerHora">—</p>
+      <p class="dato" id="cerDir"></p>
+      <a class="boton" id="cerMapa" target="_blank" rel="noopener">Ver en el mapa</a>
+    </section>
+
+    <!-- RECEPCIÓN -->
+    <section class="bloque">
+      <p class="etiqueta">Recepción</p>
+      <h2 class="titulo" id="recLugar">—</h2>
+      <p class="dato" id="recHora">—</p>
+      <p class="dato" id="recDir"></p>
+      <a class="boton" id="recMapa" target="_blank" rel="noopener">Ver en el mapa</a>
+    </section>
+
+    <!-- VESTIMENTA -->
+    <section class="bloque">
+      <p class="etiqueta">Código de vestimenta</p>
+      <h2 class="titulo" id="vest">—</h2>
+    </section>
+
+    <!-- RSVP -->
+    <section class="rsvp">
+      <h2 class="titulo">Confirma tu asistencia</h2>
+      <p class="frase">Tu presencia es muy importante para nosotros. Por favor confírmanos si podrás acompañarnos.</p>
+      <a class="boton-wa" id="botonWA" target="_blank" rel="noopener">Confirmar por WhatsApp</a>
+      <p class="limite" id="limite"></p>
+    </section>
+
+    <footer>
+      <p class="corazon">❦</p>
+      <p id="pieNovios">María & Andrés</p>
+    </footer>
+
+  </div>
+
+<script src="config.js"></script>
+<script>
+  (function () {
+    var B = window.BODA || {};
+
+    // --- Leer nombre del invitado desde el enlace ---
+    var params = new URLSearchParams(location.search);
+    function get(k){ return (params.get(k) || "").trim(); }
+    var invitado = get("invitado") || get("para") || get("guest") || get("to") || get("nombre");
+    var pases = get("pases") || get("pax");
+
+    // Título del navegador
+    var tituloBase = (B.novia || "") + " & " + (B.novio || "");
+
+    if (invitado) {
+      var nombre = decodeURIComponent(invitado);
+      document.getElementById("saludo").textContent = nombre;
+      document.title = "Invitación · " + nombre;
+    } else {
+      document.getElementById("saludo").textContent = "Estás invitado";
+      document.title = "Invitación · " + tituloBase;
+    }
+
+    if (pases) {
+      var n = parseInt(pases, 10);
+      if (!isNaN(n) && n > 0) {
+        document.getElementById("pases").textContent =
+          n === 1 ? "Reservamos 1 lugar para ti" : "Reservamos " + n + " lugares para ti";
+      }
+    }
+
+    // --- Rellenar datos de la boda ---
+    function set(id, val){ var el = document.getElementById(id); if (el && val) el.textContent = val; }
+    function link(id, url){ var el = document.getElementById(id); if (el && url) el.href = url; }
+
+    set("p1", B.novia);
+    set("p2", B.novio);
+    set("fechaPortada", B.fechaTexto);
+    set("frase", B.frase);
+    set("cerLugar", B.ceremoniaLugar);
+    set("cerHora", B.hora);
+    set("cerDir", B.ceremoniaDireccion);
+    link("cerMapa", B.ceremoniaMapa);
+    set("recLugar", B.recepcionLugar);
+    set("recHora", B.recepcionHora);
+    set("recDir", B.recepcionDireccion);
+    link("recMapa", B.recepcionMapa);
+    set("vest", B.vestimenta);
+    set("pieNovios", tituloBase);
+    if (B.limiteRSVP) document.getElementById("limite").textContent = "Fecha límite para confirmar: " + B.limiteRSVP;
+
+    // --- Botón de WhatsApp con nombre incluido ---
+    var quien = invitado ? decodeURIComponent(invitado) : "";
+    var msg = "¡Hola! Confirmo mi asistencia a la boda de " + tituloBase +
+              (quien ? ". Soy " + quien : "") + ". ✨";
+    var wa = "https://wa.me/" + (B.whatsappRSVP || "") + "?text=" + encodeURIComponent(msg);
+    document.getElementById("botonWA").href = wa;
+
+    // --- Cuenta regresiva ---
+    var reloj = document.getElementById("reloj");
+    var destino = B.fechaISO ? new Date(B.fechaISO).getTime() : null;
+    function pinta(){
+      if (!destino) return;
+      var falta = destino - Date.now();
+      if (falta <= 0) {
+        reloj.innerHTML = '<div class="caja"><b>¡Hoy!</b><span>Es el gran día</span></div>';
+        return;
+      }
+      var d = Math.floor(falta / 86400000);
+      var h = Math.floor(falta % 86400000 / 3600000);
+      var m = Math.floor(falta % 3600000 / 60000);
+      var s = Math.floor(falta % 60000 / 1000);
+      reloj.innerHTML =
+        caja(d,"Días") + caja(h,"Horas") + caja(m,"Minutos") + caja(s,"Segundos");
+    }
+    function caja(v,l){ return '<div class="caja"><b>'+v+'</b><span>'+l+'</span></div>'; }
+    pinta(); setInterval(pinta, 1000);
+  })();
+</script>
+</body>
+</html>

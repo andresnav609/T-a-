@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Generador de invitaciones personalizadas</title>
+<style>
+  :root { --tinta:#3a3226; --suave:#8a7f6d; --oro:#b08d57; --crema:#f6f1e7; --papel:#fffdf8; --linea:#e3d9c6; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Georgia,serif; color:var(--tinta); background:var(--crema); line-height:1.6; padding:24px 14px 60px; }
+  .caja { max-width:760px; margin:0 auto; background:var(--papel); border:1px solid var(--linea); border-radius:14px; padding:26px; }
+  h1 { color:var(--oro); font-weight:normal; font-size:28px; }
+  p.sub { color:var(--suave); margin-bottom:20px; }
+  label { display:block; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:var(--suave); margin:16px 0 6px; }
+  textarea, input {
+    width:100%; font-family:inherit; font-size:16px; color:var(--tinta);
+    background:var(--crema); border:1px solid var(--linea); border-radius:8px; padding:12px;
+  }
+  textarea { min-height:150px; resize:vertical; }
+  .fila { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:18px; }
+  button {
+    font-family:inherit; font-size:15px; cursor:pointer;
+    background:var(--oro); color:#fff; border:none; border-radius:30px; padding:12px 26px;
+  }
+  button.sec { background:transparent; color:var(--oro); border:1px solid var(--oro); }
+  .nota { font-size:13px; color:var(--suave); margin-top:6px; }
+  .item {
+    border:1px solid var(--linea); border-radius:10px; padding:14px 16px; margin-top:12px; background:#fff;
+  }
+  .item h3 { font-size:18px; font-weight:normal; color:var(--tinta); }
+  .item .url { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--suave); word-break:break-all; margin:6px 0 10px; }
+  .acciones { display:flex; gap:8px; flex-wrap:wrap; }
+  .acciones a, .acciones button {
+    font-size:13px; padding:8px 16px; border-radius:20px; text-decoration:none; border:1px solid var(--linea);
+    background:#fff; color:var(--tinta); cursor:pointer;
+  }
+  .wa { background:#25D366 !important; color:#fff !important; border-color:#25D366 !important; }
+  .copiar { background:var(--crema) !important; }
+  #resultado { margin-top:26px; }
+  .vacio { color:var(--suave); font-style:italic; }
+</style>
+</head>
+<body>
+  <div class="caja">
+    <h1>Generador de invitaciones</h1>
+    <p class="sub">Escribe un invitado por línea. Genera el link personalizado de cada uno y envíalo por WhatsApp.</p>
+
+    <label>Dirección web donde publicaste la invitación</label>
+    <input id="base" placeholder="https://tuusuario.github.io/tu-repo/" />
+    <p class="nota">Si la dejas vacía se usará la dirección de esta página. El generador apunta al archivo <b>index.html</b>.</p>
+
+    <label>Lista de invitados (uno por línea)</label>
+    <textarea id="lista" placeholder="Familia González&#10;María y José&#10;Ana Torres&#10;Carlos Ramírez | 2"></textarea>
+    <p class="nota">Opcional: agrega la cantidad de pases después de una barra <b>|</b>. Ej: <b>Familia López | 4</b></p>
+
+    <div class="fila">
+      <button onclick="generar()">Generar invitaciones</button>
+      <button class="sec" onclick="copiarTodo()">Copiar todos los links</button>
+    </div>
+
+    <div id="resultado"><p class="vacio">Aquí aparecerán los links personalizados…</p></div>
+  </div>
+
+<script src="config.js"></script>
+<script>
+  var B = window.BODA || {};
+  document.getElementById("base").value = (B.urlBase || "").trim();
+
+  function baseUrl() {
+    var v = document.getElementById("base").value.trim();
+    if (!v) {
+      v = location.href.split("?")[0].replace(/crear\.html$/,"").replace(/[^/]*$/,"");
+      v = v || location.origin + "/";
+    }
+    if (!/index\.html$/.test(v)) {
+      if (!v.endsWith("/")) v += "/";
+      v += "index.html";
+    }
+    return v;
+  }
+
+  function generar() {
+    var lineas = document.getElementById("lista").value.split("\n")
+      .map(function(l){ return l.trim(); }).filter(Boolean);
+    var cont = document.getElementById("resultado");
+    if (!lineas.length) { cont.innerHTML = '<p class="vacio">Escribe al menos un invitado.</p>'; return; }
+
+    var base = baseUrl();
+    var novios = (B.novia || "") + " & " + (B.novio || "");
+    var html = "";
+
+    lineas.forEach(function(linea) {
+      var partes = linea.split("|");
+      var nombre = partes[0].trim();
+      var pases = (partes[1] || "").trim();
+
+      var url = base + "?invitado=" + encodeURIComponent(nombre);
+      if (pases) url += "&pases=" + encodeURIComponent(pases);
+
+      var msg = "¡Hola " + nombre + "! 💍 " + novios + " te invitan a su boda. " +
+                "Abre tu invitación personalizada aquí: " + url;
+      var wa = "https://wa.me/?text=" + encodeURIComponent(msg);
+
+      html +=
+        '<div class="item">' +
+          '<h3>' + escapar(nombre) + (pases ? ' <small style="color:#8a7f6d">('+escapar(pases)+' pases)</small>' : '') + '</h3>' +
+          '<div class="url">' + escapar(url) + '</div>' +
+          '<div class="acciones">' +
+            '<a class="wa" href="' + wa + '" target="_blank" rel="noopener">Enviar por WhatsApp</a>' +
+            '<button class="copiar" onclick="copiar(this)" data-url="' + escapar(url) + '">Copiar link</button>' +
+            '<a href="' + url + '" target="_blank" rel="noopener">Ver invitación</a>' +
+          '</div>' +
+        '</div>';
+    });
+
+    cont.innerHTML = html;
+  }
+
+  function copiar(btn) {
+    navigator.clipboard.writeText(btn.getAttribute("data-url")).then(function(){
+      var t = btn.textContent; btn.textContent = "¡Copiado!";
+      setTimeout(function(){ btn.textContent = t; }, 1500);
+    });
+  }
+
+  function copiarTodo() {
+    var items = document.querySelectorAll(".item");
+    var texto = [];
+    items.forEach(function(it){
+      var nombre = it.querySelector("h3").childNodes[0].textContent.trim();
+      var url = it.querySelector(".url").textContent;
+      texto.push(nombre + ": " + url);
+    });
+    if (!texto.length) { alert("Primero genera las invitaciones."); return; }
+    navigator.clipboard.writeText(texto.join("\n")).then(function(){
+      alert("¡Todos los links copiados!");
+    });
+  }
+
+  function escapar(s){ return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+</script>
+</body>
+</html>
