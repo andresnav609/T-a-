@@ -3,8 +3,9 @@
 import { useRef, useState } from 'react';
 import { useApp } from '../state/app';
 import { Button, Field, NumberInput, Chip, inputCls, Sheet, Modal } from '../components/ui';
-import { weekdayName } from '../lib/format';
-import type { Category, PrivacySettings, Settings } from '../lib/types';
+import { fmtMoney, weekdayName } from '../lib/format';
+import { HOME_STAT_LABELS } from './Today';
+import type { Category, HomeStatId, PrivacySettings, Settings } from '../lib/types';
 
 const EMOJIS = ['🚀', '🌱', '🦁', '🐢', '⚡', '🌊', '🔥', '🏔️', '🎯', '🪙'];
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6'];
@@ -94,6 +95,27 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
           <Field label="Meta de ahorro mensual (USD)" hint="Se descuenta antes del límite diario.">
             <NumberInput value={s.savingsGoal} onChange={(n) => upd({ savingsGoal: n })} min={0} ariaLabel="Meta de ahorro" />
           </Field>
+          <label className="mb-1 flex min-h-[44px] items-center justify-between gap-2">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Límite diario manual</span>
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={s.manualDailyLimit !== null}
+              onChange={(e) => upd({ manualDailyLimit: e.target.checked ? Math.round(((s.salary - s.savingsGoal) / 30) * 100) / 100 : null })}
+            />
+          </label>
+          {s.manualDailyLimit !== null ? (
+            <Field
+              label="Límite diario fijo (USD)"
+              hint={`Reemplaza la fórmula. Con tus números, la fórmula daría ${fmtMoney((s.salary - s.savingsGoal) / 30)}/día aprox.`}
+            >
+              <NumberInput value={s.manualDailyLimit} onChange={(n) => upd({ manualDailyLimit: Math.max(0, n) })} min={0} ariaLabel="Límite diario manual" />
+            </Field>
+          ) : (
+            <p className="mb-3 text-xs text-slate-400">
+              Apagado: el límite se calcula con (salario − ahorro) ÷ días del ciclo.
+            </p>
+          )}
           <Field label="Día de inicio del ciclo (1–28)">
             <NumberInput value={s.cycleStartDay} onChange={(n) => upd({ cycleStartDay: Math.min(28, Math.max(1, Math.round(n))) })} min={1} max={28} step="1" ariaLabel="Día de inicio" />
           </Field>
@@ -120,12 +142,72 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
         <Section title="Sugerencia de inversión al cierre">
           {([['positiveCarry', 'Arrastre positivo'], ['extraIncome', 'Ingresos extra'], ['savingsGoal', 'Meta de ahorro']] as const).map(([key, label]) => (
             <label key={key} className="flex min-h-[44px] items-center gap-2">
-              <input type="checkbox" className="h-5 w-5 accent-emerald-500"
+              <input type="checkbox" className="h-5 w-5"
                 checked={s.suggestionIncludes[key]}
                 onChange={(e) => upd({ suggestionIncludes: { ...s.suggestionIncludes, [key]: e.target.checked } })} />
               <span className="text-sm">{label}</span>
             </label>
           ))}
+        </Section>
+
+        <Section title="Pantalla Hoy">
+          <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">Las 3 mini-estadísticas bajo el disponible</p>
+          <div className="mb-1 flex flex-wrap gap-2">
+            {(Object.keys(HOME_STAT_LABELS) as HomeStatId[]).map((id) => {
+              const selected = s.homeStats.includes(id);
+              return (
+                <Chip
+                  key={id}
+                  selected={selected}
+                  onClick={() => {
+                    if (selected) {
+                      if (s.homeStats.length > 1) upd({ homeStats: s.homeStats.filter((x) => x !== id) });
+                    } else if (s.homeStats.length < 3) {
+                      upd({ homeStats: [...s.homeStats, id] });
+                    }
+                  }}
+                >
+                  {HOME_STAT_LABELS[id]}
+                </Chip>
+              );
+            })}
+          </div>
+          <p className="mb-3 text-xs text-slate-400">Elige hasta 3 ({s.homeStats.length} de 3).</p>
+          <p className="mb-1 text-sm font-medium text-slate-600 dark:text-slate-300">Widgets</p>
+          {([
+            ['monthBudget', '💵 Gasto del mes vs presupuesto'],
+            ['daysToClose', '📆 Días para el cierre'],
+            ['weekChart', '📊 Gráfico de los últimos 7 días'],
+          ] as const).map(([key, label]) => (
+            <label key={key} className="flex min-h-[44px] items-center justify-between gap-2">
+              <span className="text-sm">{label}</span>
+              <input
+                type="checkbox"
+                className="h-5 w-5"
+                checked={s.homeWidgets[key]}
+                onChange={(e) => upd({ homeWidgets: { ...s.homeWidgets, [key]: e.target.checked } })}
+              />
+            </label>
+          ))}
+        </Section>
+
+        <Section title="Apariencia">
+          <Field label="Tema">
+            <select className={inputCls} value={s.theme} onChange={(e) => upd({ theme: e.target.value as Settings['theme'] })}>
+              <option value="auto">Automático (según el sistema)</option>
+              <option value="light">Claro</option>
+              <option value="dark">Oscuro</option>
+            </select>
+          </Field>
+          <label className="flex min-h-[44px] items-center justify-between gap-2">
+            <span className="text-sm">Usar mi color en toda la app (botones, números, gráficos)</span>
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={s.accentColor}
+              onChange={(e) => upd({ accentColor: e.target.checked })}
+            />
+          </label>
         </Section>
 
         <Section title="Categorías de gasto">
@@ -156,7 +238,7 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
           {PRIVACY_LABELS.map(({ key, label }) => (
             <label key={key} className="flex min-h-[44px] items-center justify-between gap-2">
               <span className="text-sm">{label}</span>
-              <input type="checkbox" className="h-5 w-5 accent-emerald-500"
+              <input type="checkbox" className="h-5 w-5"
                 checked={s.privacy[key]}
                 onChange={(e) => upd({ privacy: { ...s.privacy, [key]: e.target.checked } })} />
             </label>

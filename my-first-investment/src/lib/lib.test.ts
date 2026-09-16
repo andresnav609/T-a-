@@ -64,6 +64,42 @@ describe('arrastre (7.2)', () => {
   });
 });
 
+describe('límite diario manual y ajuste de un día', () => {
+  it('el límite manual reemplaza la fórmula', () => {
+    const days = computeCycle('2025-09-01', {
+      settings: { ...SETTINGS, manualDailyLimit: 25 },
+      expenses: [{ date: '2025-09-01', amount: 10 }],
+      extraIncomes: [],
+    }, '2025-09-02');
+    expect(days[0].baseLimit).toBe(25);
+    expect(days[0].carry).toBe(15);
+    expect(days[1].available).toBe(40);
+  });
+
+  it('el arrastre negativo del mes anterior se reparte también con límite manual', () => {
+    const days = computeCycle('2025-09-01', {
+      settings: { ...SETTINGS, manualDailyLimit: 20 },
+      prevCarryAdjust: -30, // −1 por día en un ciclo de 30
+      expenses: [],
+      extraIncomes: [],
+    }, '2025-09-01');
+    expect(days[0].baseLimit).toBe(19);
+  });
+
+  it('un snapshot del día (ajuste "solo hoy") gana sobre fórmula y manual', () => {
+    const days = computeCycle('2025-09-01', {
+      settings: { ...SETTINGS, manualDailyLimit: 25 },
+      expenses: [],
+      extraIncomes: [],
+      snapshots: [{ date: '2025-09-02', baseLimit: 50 }],
+    }, '2025-09-03');
+    expect(days[0].baseLimit).toBe(25);
+    expect(days[1].baseLimit).toBe(50); // solo ese día
+    expect(days[2].baseLimit).toBe(25);
+    expect(days[2].available).toBe(100); // 25 + (25+50)
+  });
+});
+
 describe('sugerencia de cierre (7.3)', () => {
   it('arrastre 45, extra 100 (invest), meta 300, todo incluido → 445', () => {
     expect(closeSuggestion(45, 100, SETTINGS)).toBe(445);

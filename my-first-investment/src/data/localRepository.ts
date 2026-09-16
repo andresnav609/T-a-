@@ -94,6 +94,9 @@ export class LocalRepository implements Repository {
   async saveDaySnapshots(snaps: DaySnapshot[]) {
     await this.db.daySnapshots.bulkPut(snaps);
   }
+  async deleteDaySnapshot(userId: string, date: string) {
+    await this.db.daySnapshots.delete([userId, date]);
+  }
 
   async listMonthCloses() {
     return this.db.monthCloses.orderBy('cycleStart').toArray();

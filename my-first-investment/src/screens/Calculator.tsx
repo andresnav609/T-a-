@@ -114,7 +114,7 @@ export default function Calculator() {
           <Field label="Crecimiento anual del aporte (%)"><NumberInput value={growth} onChange={setGrowth} min={0} ariaLabel="Crecimiento del aporte" /></Field>
         </div>
         <label className="flex min-h-[44px] items-center gap-2">
-          <input type="checkbox" className="h-5 w-5 accent-emerald-500" checked={useInflation} onChange={(e) => setUseInflation(e.target.checked)} />
+          <input type="checkbox" className="h-5 w-5" checked={useInflation} onChange={(e) => setUseInflation(e.target.checked)} />
           <span className="text-sm">Ajustar por inflación anual de</span>
           <span className="w-20"><NumberInput value={inflation} onChange={setInflation} min={0} ariaLabel="Inflación" /></span>
           <span className="text-sm">%</span>
@@ -405,7 +405,7 @@ function PactMode({ input, includePartner, setIncludePartner }: {
       {partner ? (
         partnerHasData ? (
           <label className="mb-3 flex min-h-[44px] items-center gap-2">
-            <input type="checkbox" className="h-5 w-5 accent-emerald-500" checked={includePartner} onChange={(e) => setIncludePartner(e.target.checked)} />
+            <input type="checkbox" className="h-5 w-5" checked={includePartner} onChange={(e) => setIncludePartner(e.target.checked)} />
             <span className="text-sm">Incluir a {partner.partnerProfile.name} {partner.partnerProfile.emoji}</span>
           </label>
         ) : (

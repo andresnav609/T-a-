@@ -60,3 +60,19 @@ siempre la más simple (como pide el documento).
 16. **Cierre de mes**: el modal aparece automáticamente al abrir la app tras
     el fin del ciclo; "Ahora no" deja la tarjeta pendiente en Hoy (el ciclo
     no se considera cerrado hasta confirmar).
+
+## Personalización (ronda 2, pedida por el usuario)
+
+17. **Límite diario manual**: reemplaza la fórmula, pero el arrastre negativo
+    del mes anterior se sigue repartiendo entre los días (para que un mes en
+    rojo no desaparezca al activar el modo manual).
+18. **Ajuste "solo hoy"**: reutiliza el mecanismo de snapshots por día — el
+    ajuste ES un snapshot del día, que naturalmente gana sobre fórmula y
+    límite manual, queda congelado en el historial y no toca otros días.
+19. **Settings nuevos con migración aditiva**: `normalizeSettings` rellena
+    los campos que no existían (tema, acento, estadísticas del Home, widgets)
+    sin tocar lo ya configurado; no hace falta versionar la BD.
+20. **Tema manual**: variante `dark` de Tailwind cambiada a clase (`.dark` en
+    `<html>`); "Automático" sigue a `prefers-color-scheme` con listener.
+21. **Color de acento**: variable CSS `--accent` (por defecto el verde de la
+    marca) que el color del perfil sobreescribe si el usuario lo activa.

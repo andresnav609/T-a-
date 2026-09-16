@@ -1,21 +1,53 @@
 // Pantalla Hoy — sección 8.1. "Disponible hoy" es el protagonista.
+// Las mini-estadísticas y los widgets son configurables en Ajustes.
 
 import { useMemo, useState } from 'react';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useApp } from '../state/app';
-import { Card, Button, ProgressBar, EmptyState, useConfirm } from '../components/ui';
+import { Card, Button, ProgressBar, EmptyState, useConfirm, Sheet, NumberInput, Field } from '../components/ui';
 import { ExpenseSheet } from '../components/ExpenseSheet';
 import { fmtMoney, fmtDateShort, weekdayName } from '../lib/format';
-import type { Expense, ExtraIncome } from '../lib/types';
+import { diffDays } from '../lib/dates';
+import type { Expense, ExtraIncome, HomeStatId } from '../lib/types';
+
+export const HOME_STAT_LABELS: Record<HomeStatId, string> = {
+  baseLimit: 'Límite base',
+  carryYesterday: 'Arrastre ayer',
+  spentToday: 'Gastado hoy',
+  monthSpent: 'Gasto del mes',
+  totalInvested: 'Total invertido',
+  daysToClose: 'Días p/ cierre',
+};
 
 export default function Today({ goPact, openClose }: { goPact: () => void; openClose: () => void }) {
   const app = useApp();
   const [sheet, setSheet] = useState<null | { kind: 'expense' | 'income'; editing?: Expense | ExtraIncome }>(null);
+  const [limitSheet, setLimitSheet] = useState(false);
   const [pendingDelete, confirmDelete] = useConfirm();
 
   const t = app.todayComp;
   // El número grande es lo que QUEDA hoy: disponible − gastado (= arrastre parcial).
   const available = t?.carry ?? 0;
   const yesterdayCarry = t ? t.available - t.baseLimit : 0;
+  const cycle = app.currentCycle;
+  const daysToClose = cycle ? diffDays(app.today, cycle.end) : 0;
+
+  const statFor = (id: HomeStatId): { label: string; value: string; danger?: boolean } => {
+    switch (id) {
+      case 'baseLimit':
+        return { label: HOME_STAT_LABELS[id], value: fmtMoney(t?.baseLimit ?? 0) };
+      case 'carryYesterday':
+        return { label: HOME_STAT_LABELS[id], value: fmtMoney(yesterdayCarry), danger: yesterdayCarry < 0 };
+      case 'spentToday':
+        return { label: HOME_STAT_LABELS[id], value: fmtMoney(t?.spent ?? 0) };
+      case 'monthSpent':
+        return { label: HOME_STAT_LABELS[id], value: fmtMoney(cycle?.totalSpent ?? 0) };
+      case 'totalInvested':
+        return { label: HOME_STAT_LABELS[id], value: fmtMoney(app.totalInvested) };
+      case 'daysToClose':
+        return { label: HOME_STAT_LABELS[id], value: String(daysToClose) };
+    }
+  };
   const todayExpenses = useMemo(
     () => app.expenses.filter((e) => e.date === app.today).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [app.expenses, app.today],
@@ -35,23 +67,26 @@ export default function Today({ goPact, openClose }: { goPact: () => void; openC
       {/* Disponible hoy */}
       <Card className="text-center">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Disponible hoy</p>
-        <p className={`my-1 text-6xl font-extrabold tabular-nums tracking-tight ${available >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+        <p
+          className={`my-1 text-6xl font-extrabold tabular-nums tracking-tight ${available < 0 ? 'text-red-500' : ''}`}
+          style={available >= 0 ? { color: 'var(--accent)' } : undefined}
+        >
           {fmtMoney(available)}
         </p>
         <div className="mt-2 grid grid-cols-3 gap-2 text-center text-sm">
-          <div>
-            <p className="text-slate-400">Límite base</p>
-            <p className="font-semibold tabular-nums">{fmtMoney(t?.baseLimit ?? 0)}</p>
-          </div>
-          <div>
-            <p className="text-slate-400">Arrastre ayer</p>
-            <p className={`font-semibold tabular-nums ${yesterdayCarry < 0 ? 'text-red-500' : ''}`}>{fmtMoney(yesterdayCarry)}</p>
-          </div>
-          <div>
-            <p className="text-slate-400">Gastado hoy</p>
-            <p className="font-semibold tabular-nums">{fmtMoney(t?.spent ?? 0)}</p>
-          </div>
+          {app.settings.homeStats.slice(0, 3).map((id) => {
+            const s = statFor(id);
+            return (
+              <div key={id}>
+                <p className="text-slate-400">{s.label}</p>
+                <p className={`font-semibold tabular-nums ${s.danger ? 'text-red-500' : ''}`}>{s.value}</p>
+              </div>
+            );
+          })}
         </div>
+        <button className="mt-2 min-h-[44px] text-sm text-slate-400" onClick={() => setLimitSheet(true)}>
+          ✎ Ajustar límite de hoy{app.todayOverridden ? ' (ajustado)' : ''}
+        </button>
       </Card>
 
       {/* Racha */}
@@ -80,6 +115,21 @@ export default function Today({ goPact, openClose }: { goPact: () => void; openC
           <ProgressBar pct={app.goalProgressFor(mainGoal).pct} color={app.profile!.color} />
         </Card>
       )}
+
+      {/* Widgets configurables */}
+      {app.settings.homeWidgets.monthBudget && cycle && <MonthBudgetWidget />}
+      {app.settings.homeWidgets.daysToClose && cycle && (
+        <Card className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold">📆 Cierre del ciclo</p>
+            <p className="text-xs text-slate-400">Termina el {fmtDateShort(cycle.end)}</p>
+          </div>
+          <p className="text-2xl font-extrabold tabular-nums">
+            {daysToClose} {daysToClose === 1 ? 'día' : 'días'}
+          </p>
+        </Card>
+      )}
+      {app.settings.homeWidgets.weekChart && <WeekChartWidget />}
 
       {/* Tarjetas pendientes */}
       {app.pendingClose && (
@@ -131,7 +181,8 @@ export default function Today({ goPact, openClose }: { goPact: () => void; openC
       <button
         onClick={() => setSheet({ kind: 'expense' })}
         aria-label="Registrar gasto"
-        className="fixed bottom-24 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-3xl font-bold text-white shadow-xl active:bg-emerald-600"
+        style={{ backgroundColor: 'var(--accent)' }}
+        className="fixed bottom-24 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full text-3xl font-bold text-white shadow-xl active:brightness-90"
       >
         +
       </button>
@@ -145,7 +196,97 @@ export default function Today({ goPact, openClose }: { goPact: () => void; openC
           onClose={() => setSheet(null)}
         />
       )}
+
+      {limitSheet && <TodayLimitSheet onClose={() => setLimitSheet(false)} />}
     </div>
+  );
+}
+
+/** Ajuste del límite de SOLO hoy: no toca los demás días ni los Ajustes. */
+function TodayLimitSheet({ onClose }: { onClose: () => void }) {
+  const app = useApp();
+  const current = app.todayComp?.baseLimit ?? 0;
+  const [value, setValue] = useState(Math.round(current * 100) / 100);
+  return (
+    <Sheet open onClose={onClose} title="Límite de hoy">
+      <p className="mb-3 text-sm text-slate-500">
+        Cambia el límite base <strong>solo de hoy</strong> (día especial, viaje, etc.). Mañana vuelve al
+        límite normal. Para cambiarlo todos los días, usa Ajustes → Presupuesto.
+      </p>
+      <Field label="Límite base de hoy (USD)">
+        <NumberInput value={value} onChange={setValue} min={0} ariaLabel="Límite de hoy" />
+      </Field>
+      <div className="flex flex-col gap-2">
+        <Button disabled={value < 0} onClick={async () => { await app.setTodayLimit(value); onClose(); }}>
+          Guardar solo por hoy
+        </Button>
+        {app.todayOverridden && (
+          <Button variant="secondary" onClick={async () => { await app.clearTodayLimit(); onClose(); }}>
+            Restaurar límite calculado
+          </Button>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+/** Gasto del ciclo vs presupuesto total del ciclo. */
+function MonthBudgetWidget() {
+  const app = useApp();
+  const cycle = app.currentCycle!;
+  const budget = useMemo(() => {
+    // Presupuesto = límites de los días transcurridos + límite de hoy × días restantes.
+    const spent = cycle.days.reduce((s, d) => s + d.baseLimit, 0);
+    const todayLimit = app.todayComp?.baseLimit ?? 0;
+    const remaining = Math.max(0, diffDays(app.today, cycle.end));
+    return spent + todayLimit * remaining;
+  }, [cycle, app.todayComp, app.today]);
+  const pct = budget > 0 ? (cycle.totalSpent / budget) * 100 : 0;
+  return (
+    <Card>
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <p className="font-semibold">💵 Gasto del mes</p>
+        <p className="text-sm tabular-nums text-slate-500">
+          {fmtMoney(cycle.totalSpent)} de {fmtMoney(budget)}
+        </p>
+      </div>
+      <ProgressBar pct={pct} {...(pct > 100 ? { color: '#ef4444' } : {})} />
+      <p className="mt-1 text-xs text-slate-400">
+        {pct <= 100 ? `Vas por el ${Math.round(pct)}% del presupuesto del ciclo.` : '⚠️ Ya pasaste el presupuesto del ciclo.'}
+      </p>
+    </Card>
+  );
+}
+
+/** Mini-gráfico: gastado en los últimos 7 días (verde = bajo el límite). */
+function WeekChartWidget() {
+  const app = useApp();
+  const data = useMemo(() => {
+    const all = app.cycles.flatMap((c) => c.days);
+    return all.slice(-7).map((d) => ({
+      day: fmtDateShort(d.date).split(' ')[0],
+      gastado: Math.round(d.spent * 100) / 100,
+      ok: d.carry >= 0,
+    }));
+  }, [app.cycles]);
+  if (data.length < 2) return null;
+  return (
+    <Card>
+      <p className="mb-1 font-semibold">📊 Últimos 7 días</p>
+      <div className="h-24">
+        <ResponsiveContainer>
+          <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+            <XAxis dataKey="day" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+            <Tooltip formatter={(v: number) => fmtMoney(v)} />
+            <Bar dataKey="gastado" radius={[4, 4, 0, 0]}>
+              {data.map((d, i) => (
+                <Cell key={i} fill={d.ok ? 'var(--accent)' : '#ef4444'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   );
 }
 

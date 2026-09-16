@@ -20,17 +20,35 @@ export type PrivacySettings = {
   expenses: boolean;
 };
 
+/** Mini-estadísticas elegibles para la tarjeta principal de Hoy. */
+export type HomeStatId =
+  | 'baseLimit'
+  | 'carryYesterday'
+  | 'spentToday'
+  | 'monthSpent'
+  | 'totalInvested'
+  | 'daysToClose';
+
 export type Settings = {
   userId: string;
   salary: number;
   savingsGoal: number;
   cycleStartDay: number; // 1–28
+  /** Límite diario fijo escrito a mano; null = usar la fórmula. */
+  manualDailyLimit: number | null;
   extraIncomeMode: 'invest' | 'available';
   negativeCarryMode: 'deduct' | 'reset';
   suggestionIncludes: { positiveCarry: boolean; extraIncome: boolean; savingsGoal: boolean };
   weeklySummaryDay: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = domingo
   defaultRates: number[];
   privacy: PrivacySettings;
+  // Personalización de la interfaz
+  theme: 'auto' | 'light' | 'dark';
+  /** Pintar la app con el color del perfil (no solo el avatar). */
+  accentColor: boolean;
+  /** Las 3 mini-estadísticas bajo el "disponible hoy". */
+  homeStats: HomeStatId[];
+  homeWidgets: { monthBudget: boolean; daysToClose: boolean; weekChart: boolean };
 };
 
 export type Category = {

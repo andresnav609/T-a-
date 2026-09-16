@@ -42,6 +42,7 @@ export function defaultSettings(userId: string): Settings {
     salary: 850,
     savingsGoal: 300,
     cycleStartDay: 1,
+    manualDailyLimit: null,
     extraIncomeMode: 'invest',
     negativeCarryMode: 'deduct',
     suggestionIncludes: { positiveCarry: true, extraIncome: true, savingsGoal: true },
@@ -51,6 +52,25 @@ export function defaultSettings(userId: string): Settings {
       streak: true, savingsPct: true, totalInvested: true, goals: true,
       weekly: true, amounts: false, expenses: false,
     },
+    theme: 'auto',
+    accentColor: true,
+    homeStats: ['baseLimit', 'carryYesterday', 'spentToday'],
+    homeWidgets: { monthBudget: true, daysToClose: true, weekChart: true },
+  };
+}
+
+/** Migración aditiva: rellena campos nuevos en Settings guardados por
+ *  versiones anteriores de la app, sin tocar lo que el usuario ya configuró. */
+export function normalizeSettings(stored: Settings | null, userId: string): Settings {
+  const d = defaultSettings(userId);
+  if (!stored) return d;
+  return {
+    ...d,
+    ...stored,
+    suggestionIncludes: { ...d.suggestionIncludes, ...stored.suggestionIncludes },
+    privacy: { ...d.privacy, ...stored.privacy },
+    homeWidgets: { ...d.homeWidgets, ...(stored as Partial<Settings>).homeWidgets },
+    homeStats: (stored as Partial<Settings>).homeStats?.length ? stored.homeStats : d.homeStats,
   };
 }
 
@@ -82,6 +102,8 @@ type AppState = {
   pendingWeekly: WeeklySummary | null;
   goalCtx: GoalContext;
   celebration: Celebration | null;
+  /** true si el límite de hoy fue ajustado a mano ("solo hoy"). */
+  todayOverridden: boolean;
 };
 
 type AppActions = {
@@ -104,6 +126,9 @@ type AppActions = {
   saveGoal(g: Goal): Promise<void>;
   deleteGoal(id: string): Promise<void>;
   markWeeklySeen(id: string): Promise<void>;
+  /** Ajuste del límite de SOLO hoy (snapshot del día). */
+  setTodayLimit(limit: number): Promise<void>;
+  clearTodayLimit(): Promise<void>;
   buildMyProgressCard(): ProgressCard | null;
   importPartnerCard(json: string): Promise<{ ok: boolean; error?: string }>;
   removePartner(): Promise<void>;
@@ -151,7 +176,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       repo.listExtraIncomes(), repo.listInvestments(), repo.listGoals(),
       repo.listWeeklySummaries(), repo.listMonthCloses(), repo.getPartnerSnapshot(),
     ]);
-    const s = settings ?? defaultSettings(profile?.id ?? 'local');
+    const s = normalizeSettings(settings, profile?.id ?? 'local');
     const daySnapshots = profile
       ? await repo.listDaySnapshots(profile.pactStartDate, todayISO())
       : [];
@@ -432,6 +457,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await refresh();
     },
 
+    async setTodayLimit(limit) {
+      await repo.saveDaySnapshots([{ userId, date: today, baseLimit: limit }]);
+      await refresh();
+    },
+    async clearTodayLimit() {
+      await repo.deleteDaySnapshot(userId, today);
+      await refresh();
+    },
+
     buildMyProgressCard() {
       const { profile, settings } = raw;
       if (!profile) return null;
@@ -505,6 +539,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     today,
     ...derived,
     celebration,
+    todayOverridden: raw.daySnapshots.some((s) => s.date === today),
     ...actions,
   };
 

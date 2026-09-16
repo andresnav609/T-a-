@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from './state/app';
 import Onboarding from './screens/Onboarding';
 import Today from './screens/Today';
@@ -25,6 +25,28 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('hoy');
   const [showSettings, setShowSettings] = useState(false);
   const [showClose, setShowClose] = useState<boolean | null>(null); // null = aún no decidido
+
+  // Tema Claro/Oscuro/Automático → clase .dark en <html>.
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const dark = app.settings.theme === 'dark' || (app.settings.theme === 'auto' && mq.matches);
+      document.documentElement.classList.toggle('dark', dark);
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [app.settings.theme]);
+
+  // Color de acento: el color del perfil pinta la app entera si está activo.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (app.profile && app.settings.accentColor) {
+      root.style.setProperty('--accent', app.profile.color);
+    } else {
+      root.style.removeProperty('--accent');
+    }
+  }, [app.profile?.color, app.settings.accentColor]);
 
   if (app.loading) {
     return (
@@ -71,8 +93,9 @@ export default function App() {
               key={t.id}
               onClick={() => setTab(t.id)}
               aria-current={tab === t.id ? 'page' : undefined}
+              style={tab === t.id ? { color: 'var(--accent)' } : undefined}
               className={`flex min-h-[56px] min-w-[56px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
-                tab === t.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                tab === t.id ? '' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
               <span className="text-xl" aria-hidden>{t.icon}</span>

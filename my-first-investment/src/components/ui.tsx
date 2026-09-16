@@ -35,7 +35,7 @@ export function Modal({ open, children, title }: { open: boolean; children: Reac
   );
 }
 
-export function ProgressBar({ pct, color = 'var(--color-brand)' }: { pct: number; color?: string }) {
+export function ProgressBar({ pct, color = 'var(--accent)' }: { pct: number; color?: string }) {
   const clamped = Math.max(0, Math.min(pct, 100));
   return (
     <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" role="progressbar" aria-valuenow={Math.round(clamped)} aria-valuemin={0} aria-valuemax={100}>
@@ -54,13 +54,17 @@ export function Button({ children, onClick, variant = 'primary', className = '',
 }) {
   const base = 'min-h-[44px] rounded-2xl px-4 font-semibold transition-colors disabled:opacity-40';
   const styles = {
-    primary: 'bg-emerald-500 text-white active:bg-emerald-600',
+    primary: 'text-white active:brightness-90',
     secondary: 'bg-slate-200 text-slate-800 active:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:active:bg-slate-700',
-    ghost: 'text-emerald-600 dark:text-emerald-400',
+    ghost: 'active:brightness-90',
     danger: 'bg-red-500 text-white active:bg-red-600',
   } as const;
+  const accentStyle =
+    variant === 'primary' ? { backgroundColor: 'var(--accent)' }
+    : variant === 'ghost' ? { color: 'var(--accent)' }
+    : undefined;
   return (
-    <button type={type} disabled={disabled} onClick={onClick} className={`${base} ${styles[variant]} ${className}`}>
+    <button type={type} disabled={disabled} onClick={onClick} style={accentStyle} className={`${base} ${styles[variant]} ${className}`}>
       {children}
     </button>
   );
@@ -161,7 +165,7 @@ export function Chip({ selected, onClick, children, color }: {
           ? 'border-transparent text-white'
           : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
       }`}
-      style={selected ? { backgroundColor: color ?? 'var(--color-brand)' } : undefined}
+      style={selected ? { backgroundColor: color ?? 'var(--accent)' } : undefined}
     >
       {children}
     </button>

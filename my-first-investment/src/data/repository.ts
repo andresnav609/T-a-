@@ -45,9 +45,11 @@ export interface Repository {
   saveExtraIncome(e: ExtraIncome): Promise<void>;
   deleteExtraIncome(id: string): Promise<void>;
 
-  // Snapshots de límites diarios (cambios de parámetros a mitad de ciclo)
+  // Snapshots de límites diarios (cambios de parámetros a mitad de ciclo,
+  // y ajustes manuales de "solo hoy")
   listDaySnapshots(fromDate: string, toDate: string): Promise<DaySnapshot[]>;
   saveDaySnapshots(snaps: DaySnapshot[]): Promise<void>;
+  deleteDaySnapshot(userId: string, date: string): Promise<void>;
 
   // Cierres de mes e inversiones
   listMonthCloses(): Promise<MonthClose[]>;

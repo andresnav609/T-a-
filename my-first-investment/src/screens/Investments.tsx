@@ -231,7 +231,7 @@ export function GoalSheet({ editing, onClose, prefill }: {
         <input type="date" className={inputCls} value={deadline} min={addDays(todayISO(), 1)} onChange={(e) => setDeadline(e.target.value)} />
       </Field>
       <label className="mb-4 flex min-h-[44px] items-center gap-2">
-        <input type="checkbox" className="h-5 w-5 accent-emerald-500" checked={shared} onChange={(e) => setShared(e.target.checked)} />
+        <input type="checkbox" className="h-5 w-5" checked={shared} onChange={(e) => setShared(e.target.checked)} />
         <span className="text-sm">Meta compartida del pacto (suma el progreso de ambos)</span>
       </label>
       <div className="flex gap-2">

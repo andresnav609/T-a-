@@ -23,7 +23,8 @@ export type DayComputation = {
 };
 
 export type CycleInput = {
-  settings: Pick<Settings, 'salary' | 'savingsGoal' | 'cycleStartDay' | 'extraIncomeMode' | 'negativeCarryMode'>;
+  settings: Pick<Settings, 'salary' | 'savingsGoal' | 'cycleStartDay' | 'extraIncomeMode' | 'negativeCarryMode'> &
+    Partial<Pick<Settings, 'manualDailyLimit'>>;
   /** Arrastre negativo del ciclo anterior (número ≤ 0 o 0) ya resuelto según negativeCarryMode. */
   prevCarryAdjust?: number;
   expenses: Pick<Expense, 'date' | 'amount'>[];
@@ -72,7 +73,11 @@ export function computeCycle(
   }
 
   // Precisión completa internamente; el redondeo es solo de presentación.
-  const base = baseDailyLimit(settings.salary, settings.savingsGoal, totalDays, input.prevCarryAdjust ?? 0);
+  // Un límite manual reemplaza la fórmula (el ajuste de arrastre anterior se
+  // reparte igual, para que un mes en negativo no desaparezca sin más).
+  const base = settings.manualDailyLimit != null
+    ? settings.manualDailyLimit + (input.prevCarryAdjust ?? 0) / totalDays
+    : baseDailyLimit(settings.salary, settings.savingsGoal, totalDays, input.prevCarryAdjust ?? 0);
   const out: DayComputation[] = [];
   let carry = 0; // el arrastre del primer día del ciclo es 0
   const firstDay = input.accrualStart && input.accrualStart > start ? input.accrualStart : start;
