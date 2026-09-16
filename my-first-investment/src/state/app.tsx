@@ -8,8 +8,9 @@ import { getRepository } from '../data';
 import type { BackupData } from '../data';
 import type {
   Profile, Settings, Category, Expense, ExtraIncome, DaySnapshot,
-  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot,
+  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent,
 } from '../lib/types';
+import { computeCashBalance, buildLedger, reconcileDiff, reconcileIsDue, latestSet, type LedgerRow } from '../lib/cash';
 import { computeHistory, finishedDays, type CycleSummary } from '../lib/history';
 import { computeStreak, milestoneReached, type StreakResult } from '../lib/streak';
 import { closeSuggestion, carryToNextCycle, round2, type DayComputation } from '../lib/budget';
@@ -56,6 +57,7 @@ export function defaultSettings(userId: string): Settings {
     accentColor: true,
     homeStats: ['baseLimit', 'carryYesterday', 'spentToday'],
     homeWidgets: { monthBudget: true, daysToClose: true, weekChart: true },
+    cash: { enabled: false, reconcileDay: 5, askSalary: true, weeklyPay: null, dailyReminder: true },
   };
 }
 
@@ -71,6 +73,7 @@ export function normalizeSettings(stored: Settings | null, userId: string): Sett
     privacy: { ...d.privacy, ...stored.privacy },
     homeWidgets: { ...d.homeWidgets, ...(stored as Partial<Settings>).homeWidgets },
     homeStats: (stored as Partial<Settings>).homeStats?.length ? stored.homeStats : d.homeStats,
+    cash: { ...d.cash, ...(stored as Partial<Settings>).cash },
   };
 }
 
@@ -89,6 +92,7 @@ type AppState = {
   monthCloses: MonthClose[];
   partnerSnapshot: PartnerSnapshot | null;
   daySnapshots: DaySnapshot[];
+  cashEvents: CashEvent[];
   today: string;
   // Derivados
   cycles: CycleSummary[];
@@ -104,6 +108,12 @@ type AppState = {
   celebration: Celebration | null;
   /** true si el límite de hoy fue ajustado a mano ("solo hoy"). */
   todayOverridden: boolean;
+  // Mi plata
+  cashBalance: number | null; // null = sin cuadre inicial (no activada de verdad)
+  cashLedger: LedgerRow[];
+  cashReconcileDue: boolean;
+  /** true si ayer no se registró ningún movimiento (para el recordatorio). */
+  yesterdayEmpty: boolean;
 };
 
 type AppActions = {
@@ -129,6 +139,11 @@ type AppActions = {
   /** Ajuste del límite de SOLO hoy (snapshot del día). */
   setTodayLimit(limit: number): Promise<void>;
   clearTodayLimit(): Promise<void>;
+  /** Fija el saldo real (cuadre o saldo inicial). Devuelve la diferencia. */
+  setCashBalance(realBalance: number, note?: string): Promise<number>;
+  addCashDeposit(amount: number, note?: string): Promise<void>;
+  addCashSalary(amount: number): Promise<void>;
+  deleteCashEvent(id: string): Promise<void>;
   buildMyProgressCard(): ProgressCard | null;
   importPartnerCard(json: string): Promise<{ ok: boolean; error?: string }>;
   removePartner(): Promise<void>;
@@ -148,7 +163,7 @@ export function useApp() {
 
 type Raw = Pick<AppState,
   'profile' | 'settings' | 'categories' | 'expenses' | 'extraIncomes' | 'investments' |
-  'goals' | 'weeklySummaries' | 'monthCloses' | 'partnerSnapshot' | 'daySnapshots'>;
+  'goals' | 'weeklySummaries' | 'monthCloses' | 'partnerSnapshot' | 'daySnapshots' | 'cashEvents'>;
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const repo = getRepository();
@@ -167,14 +182,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     monthCloses: [],
     partnerSnapshot: null,
     daySnapshots: [],
+    cashEvents: [],
   });
 
   const load = useCallback(async (): Promise<Raw> => {
     const [profile, settings, categories, expenses, extraIncomes, investments, goals,
-      weeklySummaries, monthCloses, partnerSnapshot] = await Promise.all([
+      weeklySummaries, monthCloses, partnerSnapshot, cashEvents] = await Promise.all([
       repo.getProfile(), repo.getSettings(), repo.listCategories(), repo.listExpenses(),
       repo.listExtraIncomes(), repo.listInvestments(), repo.listGoals(),
       repo.listWeeklySummaries(), repo.listMonthCloses(), repo.getPartnerSnapshot(),
+      repo.listCashEvents(),
     ]);
     const s = normalizeSettings(settings, profile?.id ?? 'local');
     const daySnapshots = profile
@@ -182,7 +199,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       : [];
     return {
       profile, settings: s, categories, expenses, extraIncomes, investments,
-      goals, weeklySummaries, monthCloses, partnerSnapshot, daySnapshots,
+      goals, weeklySummaries, monthCloses, partnerSnapshot, daySnapshots, cashEvents,
     };
   }, []);
 
@@ -346,6 +363,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loading, derived.streak.current]);
 
+  // ── Mi plata (derivado) ────────────────────────────────────────────────
+  const cashDerived = useMemo(() => {
+    const input = {
+      events: raw.cashEvents,
+      expenses: raw.expenses,
+      extraIncomes: raw.extraIncomes,
+      investments: raw.investments,
+    };
+    const yesterday = addDays(today, -1);
+    return {
+      cashBalance: computeCashBalance(input),
+      cashLedger: buildLedger(input),
+      cashReconcileDue:
+        raw.settings.cash.enabled && reconcileIsDue(today, raw.settings.cash.reconcileDay, raw.cashEvents),
+      yesterdayEmpty:
+        !!raw.profile && yesterday >= raw.profile.pactStartDate &&
+        !raw.expenses.some((e) => e.date === yesterday) &&
+        !raw.extraIncomes.some((e) => e.date === yesterday),
+    };
+  }, [raw, today]);
+
   // ── Acciones ───────────────────────────────────────────────────────────
   const userId = raw.profile?.id ?? 'local';
 
@@ -427,13 +465,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: uid(), userId, date: today, amount: confirmedAmount,
           source: 'monthly_close', monthCloseId: close.id,
           note: `Cierre ${cycle.start} → ${cycle.end}`,
+          createdAt: new Date().toISOString(),
         });
       }
       await refresh();
     },
 
     async addInvestment(amount, date, note) {
-      await repo.saveInvestment({ id: uid(), userId, date, amount, source: 'manual', note });
+      await repo.saveInvestment({ id: uid(), userId, date, amount, source: 'manual', note, createdAt: new Date().toISOString() });
       await refresh();
     },
     async updateInvestment(i) {
@@ -466,6 +505,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     async clearTodayLimit() {
       await repo.deleteDaySnapshot(userId, today);
+      await refresh();
+    },
+
+    async setCashBalance(realBalance, note) {
+      const computed = cashDerived.cashBalance;
+      const diff = computed === null ? 0 : reconcileDiff(realBalance, computed);
+      await repo.saveCashEvent({
+        id: uid(), userId, at: new Date().toISOString(), kind: 'set',
+        amount: realBalance, diff: computed === null ? undefined : diff, note,
+      });
+      await refresh();
+      return diff;
+    },
+    async addCashDeposit(amount, note) {
+      await repo.saveCashEvent({ id: uid(), userId, at: new Date().toISOString(), kind: 'deposit', amount, note });
+      await refresh();
+    },
+    async addCashSalary(amount) {
+      await repo.saveCashEvent({ id: uid(), userId, at: new Date().toISOString(), kind: 'salary', amount });
+      await refresh();
+    },
+    async deleteCashEvent(id) {
+      const e = raw.cashEvents.find((x) => x.id === id);
+      if (e?.kind === 'set') return; // los cuadres son el ancla: no se borran
+      await repo.deleteCashEvent(id);
       await refresh();
     },
 
@@ -543,6 +607,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ...derived,
     celebration,
     todayOverridden: raw.daySnapshots.some((s) => s.date === today),
+    ...cashDerived,
     ...actions,
   };
 

@@ -27,7 +27,8 @@ export type HomeStatId =
   | 'spentToday'
   | 'monthSpent'
   | 'totalInvested'
-  | 'daysToClose';
+  | 'daysToClose'
+  | 'cashBalance';
 
 export type Settings = {
   userId: string;
@@ -49,6 +50,18 @@ export type Settings = {
   /** Las 3 mini-estadísticas bajo el "disponible hoy". */
   homeStats: HomeStatId[];
   homeWidgets: { monthBudget: boolean; daysToClose: boolean; weekChart: boolean };
+  /** Contabilidad "Mi plata": cuenta única de efectivo/banco. */
+  cash: {
+    enabled: boolean;
+    /** Día del cuadre semanal (0=domingo … 5=viernes). */
+    reconcileDay: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    /** Preguntar en el cuadre si entró el pago del trabajo. */
+    askSalary: boolean;
+    /** Monto habitual del pago semanal (prellenado, editable), o null. */
+    weeklyPay: number | null;
+    /** Recordatorio diario en Hoy si ayer no anotaste nada. */
+    dailyReminder: boolean;
+  };
 };
 
 export type Category = {
@@ -110,6 +123,22 @@ export type Investment = {
   source: 'monthly_close' | 'manual';
   note?: string;
   monthCloseId?: string;
+  createdAt?: string; // para ordenar contra los cuadres de Mi plata
+};
+
+/** Movimiento del libro de "Mi plata" (la cuenta única de efectivo/banco).
+ *  'set' = cuadre: fija el saldo real en un momento dado (ancla del cálculo);
+ *  'deposit' = depósito/retiro manual (monto con signo);
+ *  'salary' = pago del trabajo confirmado en el chequeo semanal. */
+export type CashEvent = {
+  id: string;
+  userId: string;
+  at: string; // ISO datetime
+  kind: 'set' | 'deposit' | 'salary';
+  amount: number;
+  /** Solo en 'set': diferencia contra lo calculado (lo no registrado). */
+  diff?: number;
+  note?: string;
 };
 
 export type Goal = {

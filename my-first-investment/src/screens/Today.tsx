@@ -17,6 +17,7 @@ export const HOME_STAT_LABELS: Record<HomeStatId, string> = {
   monthSpent: 'Gasto del mes',
   totalInvested: 'Total invertido',
   daysToClose: 'Días p/ cierre',
+  cashBalance: 'Mi plata',
 };
 
 export default function Today({ goPact, openClose }: { goPact: () => void; openClose: () => void }) {
@@ -46,6 +47,12 @@ export default function Today({ goPact, openClose }: { goPact: () => void; openC
         return { label: HOME_STAT_LABELS[id], value: fmtMoney(app.totalInvested) };
       case 'daysToClose':
         return { label: HOME_STAT_LABELS[id], value: String(daysToClose) };
+      case 'cashBalance':
+        return {
+          label: HOME_STAT_LABELS[id],
+          value: app.cashBalance === null ? '—' : fmtMoney(app.cashBalance),
+          danger: app.cashBalance !== null && app.cashBalance < 0,
+        };
     }
   };
   const todayExpenses = useMemo(
@@ -115,6 +122,10 @@ export default function Today({ goPact, openClose }: { goPact: () => void; openC
           <ProgressBar pct={app.goalProgressFor(mainGoal).pct} color={app.profile!.color} />
         </Card>
       )}
+
+      {/* Mi plata */}
+      {app.settings.cash.enabled && <CashWidget />}
+      {app.settings.cash.enabled && app.settings.cash.dailyReminder && <DailyReminderCard />}
 
       {/* Widgets configurables */}
       {app.settings.homeWidgets.monthBudget && cycle && <MonthBudgetWidget />}
@@ -227,6 +238,231 @@ function TodayLimitSheet({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </Sheet>
+  );
+}
+
+/** Mi plata: saldo derivado, cuadre semanal y libro de movimientos. */
+function CashWidget() {
+  const app = useApp();
+  const [sheet, setSheet] = useState<null | 'reconcile' | 'ledger' | 'deposit'>(null);
+  const hasAnchor = app.cashBalance !== null;
+  const patrimonio = (app.cashBalance ?? 0) + app.totalInvested;
+
+  return (
+    <>
+      <Card className={app.cashReconcileDue ? 'border-l-4 border-amber-400' : ''}>
+        <div className="flex items-baseline justify-between">
+          <p className="font-semibold">💰 Mi plata</p>
+          {hasAnchor && (
+            <p className={`text-2xl font-extrabold tabular-nums ${app.cashBalance! < 0 ? 'text-red-500' : ''}`}>
+              {fmtMoney(app.cashBalance!)}
+            </p>
+          )}
+        </div>
+        {hasAnchor ? (
+          <>
+            <p className="mt-0.5 text-xs text-slate-400">
+              + {fmtMoney(app.totalInvested)} invertido = <strong>{fmtMoney(patrimonio)}</strong> en total
+            </p>
+            {app.cashReconcileDue && (
+              <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-400">
+                📋 Toca hacer el cuadre semanal: ¿cuánto tienes de verdad?
+              </p>
+            )}
+            <div className="mt-2 flex gap-2">
+              <Button variant={app.cashReconcileDue ? 'primary' : 'secondary'} className="flex-1" onClick={() => setSheet('reconcile')}>
+                Cuadrar
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setSheet('deposit')}>+ Depósito</Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setSheet('ledger')}>Movimientos</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mb-2 mt-1 text-sm text-slate-500">
+              Dime cuánto tienes hoy en tu cuenta y a partir de ahí llevo la contabilidad sola:
+              gastos bajan, ingresos suben, inversiones pasan a Invertido.
+            </p>
+            <Button className="w-full" onClick={() => setSheet('reconcile')}>Poner mi saldo inicial</Button>
+          </>
+        )}
+      </Card>
+      {sheet === 'reconcile' && <CashReconcileSheet initial={!hasAnchor} onClose={() => setSheet(null)} />}
+      {sheet === 'deposit' && <CashDepositSheet onClose={() => setSheet(null)} />}
+      {sheet === 'ledger' && <CashLedgerSheet onClose={() => setSheet(null)} />}
+    </>
+  );
+}
+
+/** Cuadre: pregunta el pago del trabajo (si aplica) y el saldo real, y
+ *  muestra la discrepancia contra lo calculado. */
+function CashReconcileSheet({ initial, onClose }: { initial: boolean; onClose: () => void }) {
+  const app = useApp();
+  const cash = app.settings.cash;
+  const [step, setStep] = useState<'salary' | 'balance' | 'done'>(
+    !initial && cash.askSalary ? 'salary' : 'balance',
+  );
+  const [salary, setSalary] = useState(cash.weeklyPay ?? 0);
+  const [real, setReal] = useState(app.cashBalance ?? 0);
+  const [result, setResult] = useState<number | null>(null);
+
+  const confirmBalance = async () => {
+    const diff = await app.setCashBalance(real, initial ? 'Saldo inicial' : undefined);
+    setResult(diff);
+    setStep('done');
+  };
+
+  return (
+    <Sheet open onClose={onClose} title={initial ? 'Mi saldo inicial' : 'Cuadre semanal'}>
+      {step === 'salary' && (
+        <>
+          <p className="mb-3 text-sm text-slate-500">💼 ¿Te entró plata del trabajo desde el último cuadre?</p>
+          <Field label="Monto (USD)">
+            <NumberInput value={salary} onChange={setSalary} min={0} ariaLabel="Pago recibido" />
+          </Field>
+          <div className="flex flex-col gap-2">
+            <Button disabled={salary <= 0} onClick={async () => { await app.addCashSalary(salary); setStep('balance'); }}>
+              Sí, sumar {fmtMoney(salary)}
+            </Button>
+            <Button variant="secondary" onClick={() => setStep('balance')}>No / aún no</Button>
+          </div>
+        </>
+      )}
+      {step === 'balance' && (
+        <>
+          <p className="mb-1 text-sm text-slate-500">
+            {initial
+              ? '¿Cuánto tienes AHORA en tu cuenta (banco + efectivo)?'
+              : '¿Cuánto tienes AHORA de verdad en tu cuenta?'}
+          </p>
+          {!initial && app.cashBalance !== null && (
+            <p className="mb-2 text-xs text-slate-400">Según lo registrado deberías tener {fmtMoney(app.cashBalance)}.</p>
+          )}
+          <Field label="Saldo real (USD)">
+            <NumberInput value={real} onChange={setReal} ariaLabel="Saldo real" />
+          </Field>
+          <Button className="w-full" onClick={confirmBalance}>Guardar</Button>
+        </>
+      )}
+      {step === 'done' && result !== null && (
+        <div className="text-center">
+          {Math.abs(result) < 0.01 || initial ? (
+            <>
+              <p className="text-4xl" aria-hidden>✅</p>
+              <p className="mt-2 font-semibold">{initial ? 'Listo, contabilidad activada.' : '¡Todo cuadra! Ni un centavo perdido.'}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-4xl" aria-hidden>🤔</p>
+              <p className="mt-2 font-semibold">
+                Hay {fmtMoney(Math.abs(result))} {result < 0 ? 'menos' : 'más'} de lo registrado.
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {result < 0
+                  ? '¿Se te olvidó anotar algún gasto? Quedó registrado como diferencia en el cuadre; si lo recuerdas, anótalo como gasto para tu historial.'
+                  : '¿Te entró plata que no anotaste? Quedó registrada como diferencia en el cuadre.'}
+              </p>
+            </>
+          )}
+          <Button className="mt-4 w-full" onClick={onClose}>Entendido</Button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function CashDepositSheet({ onClose }: { onClose: () => void }) {
+  const app = useApp();
+  const [amount, setAmount] = useState(0);
+  const [note, setNote] = useState('');
+  const [withdraw, setWithdraw] = useState(false);
+  return (
+    <Sheet open onClose={onClose} title="Depósito o retiro">
+      <div className="mb-3 flex gap-2">
+        <ChipBtn selected={!withdraw} onClick={() => setWithdraw(false)}>⬆️ Me entró plata</ChipBtn>
+        <ChipBtn selected={withdraw} onClick={() => setWithdraw(true)}>⬇️ Saqué plata</ChipBtn>
+      </div>
+      <Field label="Monto (USD)"><NumberInput value={amount} onChange={setAmount} min={0} ariaLabel="Monto del depósito" /></Field>
+      <Field label="Nota (opcional)">
+        <input className="w-full min-h-[44px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-800" value={note} onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      <Button className="w-full" disabled={amount <= 0}
+        onClick={async () => { await app.addCashDeposit(withdraw ? -amount : amount, note.trim() || undefined); onClose(); }}>
+        Guardar
+      </Button>
+    </Sheet>
+  );
+}
+
+function ChipBtn({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={selected}
+      style={selected ? { backgroundColor: 'var(--accent)' } : undefined}
+      className={`min-h-[44px] flex-1 rounded-full border-2 px-3 text-sm font-medium ${selected ? 'border-transparent text-white' : 'border-slate-300 dark:border-slate-700'}`}>
+      {children}
+    </button>
+  );
+}
+
+function CashLedgerSheet({ onClose }: { onClose: () => void }) {
+  const app = useApp();
+  return (
+    <Sheet open onClose={onClose} title="Movimientos de Mi plata">
+      <p className="mb-2 text-xs text-slate-400">Desde el último cuadre. Gastos e ingresos vienen de lo que registras; edítalos en Hoy o Historial.</p>
+      {app.cashLedger.length === 0 ? (
+        <EmptyState emoji="🏦" text="Sin movimientos todavía." />
+      ) : (
+        <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+          {app.cashLedger.map((r, i) => (
+            <li key={i} className="flex items-center gap-2 py-2">
+              <span aria-hidden>{r.emoji}</span>
+              <div className="flex-1">
+                <p>{r.label}</p>
+                <p className="text-xs text-slate-400">{new Date(r.at).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                {r.diff !== undefined && Math.abs(r.diff) >= 0.01 && (
+                  <p className={`text-xs ${r.diff < 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    diferencia {fmtMoney(r.diff)} sin registrar
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                {r.delta !== null && (
+                  <p className={`font-semibold tabular-nums ${r.delta < 0 ? '' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {r.delta >= 0 ? '+' : ''}{fmtMoney(r.delta)}
+                  </p>
+                )}
+                <p className="text-xs tabular-nums text-slate-400">= {fmtMoney(r.balanceAfter)}</p>
+              </div>
+              {r.eventId && (
+                <button aria-label="Borrar movimiento" className="flex h-11 w-9 items-center justify-center text-slate-300 dark:text-slate-600"
+                  onClick={() => app.deleteCashEvent(r.eventId!)}>✕</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
+  );
+}
+
+/** Recordatorio diario: si ayer no anotaste nada, pregunta al abrir la app. */
+function DailyReminderCard() {
+  const app = useApp();
+  const key = 'mfi-reminder-dismissed';
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(key) === app.today; } catch { return false; }
+  });
+  if (dismissed || !app.yesterdayEmpty) return null;
+  const dismiss = () => {
+    try { localStorage.setItem(key, app.today); } catch { /* sin localStorage, se repite y ya */ }
+    setDismissed(true);
+  };
+  return (
+    <Card className="flex items-center gap-3 border-l-4 border-blue-400">
+      <span className="text-2xl" aria-hidden>🔔</span>
+      <p className="flex-1 text-sm">Ayer no anotaste ningún movimiento. ¿Se te pasó algún gasto?</p>
+      <Button variant="secondary" onClick={dismiss}>No gasté</Button>
+    </Card>
   );
 }
 

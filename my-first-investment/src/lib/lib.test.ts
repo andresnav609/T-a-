@@ -280,6 +280,60 @@ describe('privacidad de la tarjeta (4.3)', () => {
   });
 });
 
+describe('Mi plata: contabilidad (todo balanceado)', () => {
+  const set = (at: string, amount: number): import('./types').CashEvent =>
+    ({ id: 's' + at, userId: 'u', at, kind: 'set', amount });
+  const dep = (at: string, amount: number): import('./types').CashEvent =>
+    ({ id: 'd' + at, userId: 'u', at, kind: 'deposit', amount });
+
+  it('gasto baja, ingreso sube, inversión baja: saldo derivado', async () => {
+    const { computeCashBalance } = await import('./cash');
+    const balance = computeCashBalance({
+      events: [set('2025-09-10T09:00:00', 500)],
+      expenses: [{ amount: 25, createdAt: '2025-09-11T10:00:00' }],
+      extraIncomes: [{ amount: 40, createdAt: '2025-09-12T10:00:00' }],
+      investments: [{ amount: 5, date: '2025-09-13', source: 'manual' }],
+    });
+    expect(balance).toBe(510); // 500 − 25 + 40 − 5
+  });
+
+  it('los movimientos ANTERIORES al cuadre no cuentan (el cuadre es el ancla)', async () => {
+    const { computeCashBalance } = await import('./cash');
+    const balance = computeCashBalance({
+      events: [set('2025-09-10T09:00:00', 500)],
+      expenses: [{ amount: 999, createdAt: '2025-09-01T10:00:00' }],
+      extraIncomes: [],
+      investments: [],
+    });
+    expect(balance).toBe(500);
+  });
+
+  it('depósitos y pagos del trabajo suman; sin cuadre inicial no hay saldo', async () => {
+    const { computeCashBalance } = await import('./cash');
+    expect(computeCashBalance({ events: [], expenses: [], extraIncomes: [], investments: [] })).toBeNull();
+    const balance = computeCashBalance({
+      events: [set('2025-09-10T09:00:00', 100), dep('2025-09-11T09:00:00', 80), dep('2025-09-12T09:00:00', -30)],
+      expenses: [], extraIncomes: [], investments: [],
+    });
+    expect(balance).toBe(150);
+  });
+
+  it('discrepancia del cuadre: negativa = gastos sin anotar', async () => {
+    const { reconcileDiff } = await import('./cash');
+    expect(reconcileDiff(480, 500)).toBe(-20); // faltan $20 por anotar
+    expect(reconcileDiff(500, 500)).toBe(0);
+  });
+
+  it('el cuadre vence el día configurado (viernes) y se limpia al cuadrar', async () => {
+    const { reconcileIsDue } = await import('./cash');
+    // 2025-09-16 es martes; el último viernes fue 2025-09-12.
+    expect(reconcileIsDue('2025-09-16', 5, [set('2025-09-10T09:00:00', 500)])).toBe(true);
+    expect(reconcileIsDue('2025-09-16', 5, [set('2025-09-13T09:00:00', 500)])).toBe(false);
+    // El mismo viernes también vence si el cuadre es más viejo.
+    expect(reconcileIsDue('2025-09-12', 5, [set('2025-09-11T09:00:00', 500)])).toBe(true);
+  });
+});
+
 describe('ciclos y semanas (fechas)', () => {
   it('ciclo con inicio el 1 cubre el mes calendario', () => {
     expect(cycleStartFor('2025-09-16', 1)).toBe('2025-09-01');

@@ -5,7 +5,7 @@
 
 import type {
   Profile, Settings, Category, Expense, ExtraIncome, DaySnapshot,
-  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot,
+  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent,
 } from '../lib/types';
 
 export type BackupData = {
@@ -23,6 +23,7 @@ export type BackupData = {
   goals: Goal[];
   weeklySummaries: WeeklySummary[];
   partnerSnapshot: PartnerSnapshot | null;
+  cashEvents?: CashEvent[];
 };
 
 export interface Repository {
@@ -66,6 +67,11 @@ export interface Repository {
   // Resúmenes semanales
   listWeeklySummaries(): Promise<WeeklySummary[]>;
   saveWeeklySummary(w: WeeklySummary): Promise<void>;
+
+  // Mi plata (libro de la cuenta de efectivo/banco)
+  listCashEvents(): Promise<CashEvent[]>;
+  saveCashEvent(e: CashEvent): Promise<void>;
+  deleteCashEvent(id: string): Promise<void>;
 
   // Pacto (Fase 1: snapshot importado del compañero)
   getPartnerSnapshot(): Promise<PartnerSnapshot | null>;

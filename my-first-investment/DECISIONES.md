@@ -81,3 +81,20 @@ siempre la más simple (como pide el documento).
     nunca < 0. Antes la meta configurada contaba completa desde el día 1 y
     una meta recién creada aparecía "Lograda" al instante. Las metas
     logradas ahora tienen botón "Reactivar".
+
+## Mi plata (ronda 3, pedida por el usuario)
+
+23. **Cuenta única derivada**: el saldo de "Mi plata" no se anota dos veces —
+    se deriva del último cuadre ('set', el ancla) más los flujos posteriores:
+    gastos restan, ingresos extra suman, inversiones restan (partida doble
+    con el total invertido). Tabla nueva `cashEvents` (Dexie v2, migración
+    aditiva).
+24. **Cuadre semanal** (viernes por defecto, configurable): pregunta primero
+    si entró el pago del trabajo (monto prellenado editable) y luego el saldo
+    real. La diferencia contra lo calculado queda guardada en el propio
+    cuadre ("¿se te olvidó anotar algún gasto?") y visible en el libro.
+25. **Recordatorio diario** = tarjeta al abrir la app si ayer no se registró
+    ningún movimiento (descartable por día vía localStorage). Notificaciones
+    push reales con la app cerrada requieren servidor → Fase 2.
+26. **Los cuadres no se borran** (son el ancla del cálculo); depósitos y
+    pagos sí, desde el libro de movimientos.

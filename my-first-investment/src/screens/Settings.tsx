@@ -150,6 +150,44 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
           ))}
         </Section>
 
+        <Section title="Mi plata (contabilidad)">
+          <label className="flex min-h-[44px] items-center justify-between gap-2">
+            <span className="text-sm">Llevar el saldo de mi cuenta (banco + efectivo)</span>
+            <input type="checkbox" className="h-5 w-5" checked={s.cash.enabled}
+              onChange={(e) => upd({ cash: { ...s.cash, enabled: e.target.checked } })} />
+          </label>
+          {s.cash.enabled && (
+            <>
+              <p className="mb-3 text-xs text-slate-400">
+                El saldo se calcula solo: gastos bajan, ingresos suben, inversiones pasan a Invertido.
+                {app.cashBalance === null ? ' Pon tu saldo inicial en la tarjeta "Mi plata" de Hoy.' : ''}
+              </p>
+              <Field label="Día del cuadre semanal">
+                <select className={inputCls} value={s.cash.reconcileDay}
+                  onChange={(e) => upd({ cash: { ...s.cash, reconcileDay: Number(e.target.value) as Settings['cash']['reconcileDay'] } })}>
+                  {[0, 1, 2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{weekdayName(d)}</option>)}
+                </select>
+              </Field>
+              <label className="flex min-h-[44px] items-center justify-between gap-2">
+                <span className="text-sm">Preguntar en el cuadre si me entró el pago del trabajo</span>
+                <input type="checkbox" className="h-5 w-5" checked={s.cash.askSalary}
+                  onChange={(e) => upd({ cash: { ...s.cash, askSalary: e.target.checked } })} />
+              </label>
+              {s.cash.askSalary && (
+                <Field label="Monto habitual del pago (prellenado, editable cada vez)">
+                  <NumberInput value={s.cash.weeklyPay ?? 0}
+                    onChange={(n) => upd({ cash: { ...s.cash, weeklyPay: n > 0 ? n : null } })} min={0} ariaLabel="Pago habitual" />
+                </Field>
+              )}
+              <label className="flex min-h-[44px] items-center justify-between gap-2">
+                <span className="text-sm">Recordatorio diario si ayer no anoté nada</span>
+                <input type="checkbox" className="h-5 w-5" checked={s.cash.dailyReminder}
+                  onChange={(e) => upd({ cash: { ...s.cash, dailyReminder: e.target.checked } })} />
+              </label>
+            </>
+          )}
+        </Section>
+
         <Section title="Pantalla Hoy">
           <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">Las 3 mini-estadísticas bajo el disponible</p>
           <div className="mb-1 flex flex-wrap gap-2">

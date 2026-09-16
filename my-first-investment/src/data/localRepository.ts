@@ -3,7 +3,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   Profile, Settings, Category, Expense, ExtraIncome, DaySnapshot,
-  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot,
+  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent,
 } from '../lib/types';
 import type { Repository, BackupData } from './repository';
 
@@ -19,6 +19,7 @@ class MfiDatabase extends Dexie {
   goals!: Table<Goal, string>;
   weeklySummaries!: Table<WeeklySummary, string>;
   partnerSnapshots!: Table<PartnerSnapshot & { id: string }, string>;
+  cashEvents!: Table<CashEvent, string>;
 
   constructor() {
     super('my-first-investment');
@@ -34,6 +35,11 @@ class MfiDatabase extends Dexie {
       goals: 'id, status',
       weeklySummaries: 'id, weekStart',
       partnerSnapshots: 'id',
+    });
+    // v2: libro de "Mi plata". Migración aditiva: solo agrega la tabla,
+    // los datos existentes quedan intactos.
+    this.version(2).stores({
+      cashEvents: 'id, at',
     });
   }
 }
@@ -132,6 +138,16 @@ export class LocalRepository implements Repository {
     await this.db.weeklySummaries.put(w);
   }
 
+  async listCashEvents() {
+    return this.db.cashEvents.orderBy('at').toArray();
+  }
+  async saveCashEvent(e: CashEvent) {
+    await this.db.cashEvents.put(e);
+  }
+  async deleteCashEvent(id: string) {
+    await this.db.cashEvents.delete(id);
+  }
+
   async getPartnerSnapshot() {
     const s = await this.db.partnerSnapshots.get('partner');
     if (!s) return null;
@@ -161,6 +177,7 @@ export class LocalRepository implements Repository {
       goals: await this.db.goals.toArray(),
       weeklySummaries: await this.db.weeklySummaries.toArray(),
       partnerSnapshot: await this.getPartnerSnapshot(),
+      cashEvents: await this.db.cashEvents.toArray(),
     };
   }
 
@@ -177,6 +194,7 @@ export class LocalRepository implements Repository {
       await this.db.investments.bulkPut(data.investments ?? []);
       await this.db.goals.bulkPut(data.goals ?? []);
       await this.db.weeklySummaries.bulkPut(data.weeklySummaries ?? []);
+      await this.db.cashEvents.bulkPut(data.cashEvents ?? []);
       if (data.partnerSnapshot) await this.db.partnerSnapshots.put({ ...data.partnerSnapshot, id: 'partner' });
     });
   }
