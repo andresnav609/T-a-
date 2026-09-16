@@ -98,3 +98,13 @@ siempre la más simple (como pide el documento).
     push reales con la app cerrada requieren servidor → Fase 2.
 26. **Los cuadres no se borran** (son el ancla del cálculo); depósitos y
     pagos sí, desde el libro de movimientos.
+27. **Pestaña "Plata"** (ronda 4): Mi plata tiene pantalla propia en la barra
+    inferior (6 pestañas; "Calculadora" pasa a llamarse "Calc."), con saldo,
+    patrimonio, cuadre, depósitos y libro completo. El widget compacto de Hoy
+    se mantiene. Componentes compartidos viven en `screens/Cash.tsx`.
+28. **Calendario interactivo en Historial** (ronda 4): reemplaza la rejilla
+    de contribuciones por un calendario mensual navegable; tocar un día
+    muestra su detalle completo (límite, disponible, gastado, arrastre,
+    semáforo) y todos sus movimientos (gastos e ingresos editables al tocar,
+    inversiones y movimientos de plata). Conserva los colores y el resumen
+    de racha.

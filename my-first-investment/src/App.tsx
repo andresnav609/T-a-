@@ -6,17 +6,19 @@ import History from './screens/History';
 import Investments from './screens/Investments';
 import Calculator from './screens/Calculator';
 import Pact from './screens/Pact';
+import CashScreen from './screens/Cash';
 import SettingsScreen from './screens/Settings';
 import { MonthCloseModal } from './components/MonthCloseModal';
 import { Modal, Button } from './components/ui';
 
-export type Tab = 'hoy' | 'historial' | 'inversion' | 'calculadora' | 'pacto';
+export type Tab = 'hoy' | 'plata' | 'historial' | 'inversion' | 'calculadora' | 'pacto';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'hoy', label: 'Hoy', icon: '☀️' },
+  { id: 'plata', label: 'Plata', icon: '💰' },
   { id: 'historial', label: 'Historial', icon: '📅' },
   { id: 'inversion', label: 'Inversión', icon: '📈' },
-  { id: 'calculadora', label: 'Calculadora', icon: '🧮' },
+  { id: 'calculadora', label: 'Calc.', icon: '🧮' },
   { id: 'pacto', label: 'Pacto', icon: '🤝' },
 ];
 
@@ -80,6 +82,7 @@ export default function App() {
 
       <main className="flex-1 px-4 pb-28">
         {tab === 'hoy' && <Today goPact={() => setTab('pacto')} openClose={() => setShowClose(true)} />}
+        {tab === 'plata' && <CashScreen />}
         {tab === 'historial' && <History />}
         {tab === 'inversion' && <Investments goCalc={() => setTab('calculadora')} />}
         {tab === 'calculadora' && <Calculator />}

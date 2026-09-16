@@ -5,8 +5,10 @@ import { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { useApp } from '../state/app';
 import { Card, Chip, EmptyState, inputCls } from '../components/ui';
-import { fmtMoney, fmtDateShort } from '../lib/format';
-import { finishedDays } from '../lib/history';
+import { ExpenseSheet } from '../components/ExpenseSheet';
+import { fmtMoney, fmtDate, fmtDateShort, weekdayName } from '../lib/format';
+import { toISODate } from '../lib/dates';
+import type { Expense, ExtraIncome } from '../lib/types';
 
 export default function History() {
   const app = useApp();
@@ -52,7 +54,7 @@ export default function History() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2">
-        {([['ciclo', 'Ciclo'], ['resumenes', 'Resúmenes'], ['calendario', 'Racha']] as const).map(([id, label]) => (
+        {([['ciclo', 'Ciclo'], ['resumenes', 'Resúmenes'], ['calendario', 'Calendario']] as const).map(([id, label]) => (
           <Chip key={id} selected={subtab === id} onClick={() => setSubtab(id)}>{label}</Chip>
         ))}
       </div>
@@ -192,7 +194,7 @@ export default function History() {
       )}
 
       {subtab === 'resumenes' && <WeeklyList />}
-      {subtab === 'calendario' && <StreakCalendar />}
+      {subtab === 'calendario' && <MonthCalendar />}
     </div>
   );
 }
@@ -220,53 +222,155 @@ function WeeklyList() {
   );
 }
 
-/** Calendario de racha estilo mapa de contribuciones. */
-function StreakCalendar() {
+/** Calendario mensual interactivo: toca un día para ver todo lo de ese día.
+ *  Los colores siguen la racha (verde = bajo el límite, rojo = sobre). */
+function MonthCalendar() {
   const app = useApp();
-  const days = useMemo(() => {
-    if (!app.profile) return [];
-    return finishedDays(app.cycles, app.profile.pactStartDate, app.today);
-  }, [app.cycles, app.profile, app.today]);
-  if (days.length === 0) return <EmptyState emoji="🗓️" text="Tu calendario de racha se irá pintando día a día." />;
-
-  const byDate = new Map(days.map((d) => [d.date, d.carry >= 0]));
-  const first = days[0].date;
-  // Rejilla semanal: columnas = semanas, filas = día de la semana.
-  const start = new Date(first + 'T00:00');
-  start.setDate(start.getDate() - start.getDay());
-  const cells: { date: string; ok: boolean | null }[] = [];
-  const cursor = new Date(start);
   const todayD = new Date(app.today + 'T00:00');
-  while (cursor <= todayD) {
-    const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-    cells.push({ date: iso, ok: byDate.has(iso) ? byDate.get(iso)! : null });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  const weeks: typeof cells[] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const [month, setMonth] = useState(() => new Date(todayD.getFullYear(), todayD.getMonth(), 1));
+  const [selected, setSelected] = useState<string | null>(app.today);
+  const [editSheet, setEditSheet] = useState<null | { kind: 'expense' | 'income'; editing: Expense | ExtraIncome }>(null);
+
+  const dayByDate = useMemo(() => {
+    const m = new Map<string, { carry: number; baseLimit: number; spent: number; available: number }>();
+    for (const c of app.cycles) for (const d of c.days) m.set(d.date, d);
+    return m;
+  }, [app.cycles]);
+
+  // Rejilla del mes: celdas vacías hasta el primer día + días del mes.
+  const cells = useMemo(() => {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1);
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const out: (string | null)[] = Array(first.getDay()).fill(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      out.push(toISODate(new Date(month.getFullYear(), month.getMonth(), d)));
+    }
+    return out;
+  }, [month]);
+
+  const isCurrentMonth = month.getFullYear() === todayD.getFullYear() && month.getMonth() === todayD.getMonth();
+  const monthLabel = month.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+
+  const sel = selected ? dayByDate.get(selected) : undefined;
+  const selExpenses = selected ? app.expenses.filter((e) => e.date === selected) : [];
+  const selIncomes = selected ? app.extraIncomes.filter((e) => e.date === selected) : [];
+  const selInvestments = selected ? app.investments.filter((i) => i.date === selected) : [];
+  const selCash = selected ? app.cashEvents.filter((e) => e.at.slice(0, 10) === selected && e.kind !== 'set') : [];
+  const catById = (id: string) => app.categories.find((c) => c.id === id);
 
   return (
-    <Card>
-      <p className="mb-1 font-semibold">Calendario de racha</p>
-      <p className="mb-3 text-xs text-slate-400">🟩 bajo el límite · 🟥 sobre el límite</p>
-      <div className="flex gap-1 overflow-x-auto pb-2">
-        {weeks.map((week, i) => (
-          <div key={i} className="flex flex-col gap-1">
-            {week.map((c) => (
-              <div
-                key={c.date}
-                title={c.date}
-                className={`h-4 w-4 rounded-sm ${
-                  c.ok === null ? 'bg-slate-100 dark:bg-slate-800' : c.ok ? 'bg-emerald-500' : 'bg-red-400'
+    <div className="flex flex-col gap-3">
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <button aria-label="Mes anterior" className="h-11 w-11 rounded-full text-lg text-slate-500"
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>‹</button>
+          <p className="font-semibold capitalize">{monthLabel}</p>
+          <button aria-label="Mes siguiente" disabled={isCurrentMonth}
+            className="h-11 w-11 rounded-full text-lg text-slate-500 disabled:opacity-20"
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>›</button>
+        </div>
+        <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400">
+          {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((date, i) => {
+            if (!date) return <span key={`x${i}`} />;
+            const info = dayByDate.get(date);
+            const isToday = date === app.today;
+            const finished = !!info && date < app.today;
+            const bg = !info
+              ? 'bg-slate-100 text-slate-300 dark:bg-slate-800 dark:text-slate-600'
+              : isToday
+                ? 'text-white'
+                : finished
+                  ? info.carry >= 0 ? 'bg-emerald-500/90 text-white' : 'bg-red-400/90 text-white'
+                  : 'bg-slate-100 text-slate-400 dark:bg-slate-800';
+            return (
+              <button
+                key={date}
+                onClick={() => setSelected(date)}
+                aria-label={`Ver día ${date}`}
+                style={isToday ? { backgroundColor: 'var(--accent)' } : undefined}
+                className={`flex h-10 items-center justify-center rounded-lg text-sm font-medium ${bg} ${
+                  selected === date ? 'ring-2 ring-slate-900 ring-offset-1 dark:ring-white dark:ring-offset-slate-950' : ''
                 }`}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-      <p className="text-sm text-slate-500">
-        Racha actual: <strong>{app.streak.current}</strong> · Mejor: <strong>{app.streak.best}</strong>
-      </p>
-    </Card>
+              >
+                {Number(date.slice(8))}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          🟩 bajo el límite · 🟥 sobre el límite · Racha actual: <strong>{app.streak.current}</strong> · Mejor: <strong>{app.streak.best}</strong>
+        </p>
+      </Card>
+
+      {selected && (
+        <Card>
+          <p className="mb-0.5 font-semibold capitalize">
+            {weekdayName(new Date(selected + 'T00:00').getDay())} {fmtDate(selected)}
+            {selected === app.today ? ' · hoy' : ''}
+          </p>
+          {sel ? (
+            <>
+              <p className="mb-2 text-xs text-slate-400">
+                {selected < app.today ? (sel.carry >= 0 ? '🟢 Terminó bajo el límite' : '🔴 Terminó sobre el límite') : '🔵 En curso'}
+              </p>
+              <div className="mb-2 grid grid-cols-4 gap-1 text-center text-xs">
+                <div className="rounded-lg bg-slate-50 p-1.5 dark:bg-slate-800"><p className="text-slate-400">Límite</p><p className="font-semibold tabular-nums">{fmtMoney(sel.baseLimit)}</p></div>
+                <div className="rounded-lg bg-slate-50 p-1.5 dark:bg-slate-800"><p className="text-slate-400">Disponible</p><p className="font-semibold tabular-nums">{fmtMoney(sel.available)}</p></div>
+                <div className="rounded-lg bg-slate-50 p-1.5 dark:bg-slate-800"><p className="text-slate-400">Gastado</p><p className="font-semibold tabular-nums">{fmtMoney(sel.spent)}</p></div>
+                <div className="rounded-lg bg-slate-50 p-1.5 dark:bg-slate-800"><p className="text-slate-400">Arrastre</p><p className={`font-semibold tabular-nums ${sel.carry < 0 ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{fmtMoney(sel.carry)}</p></div>
+              </div>
+            </>
+          ) : (
+            <p className="mb-2 text-sm text-slate-400">Sin datos: {selected > app.today ? 'todavía no llega ese día.' : 'es anterior al inicio del pacto.'}</p>
+          )}
+
+          {selExpenses.length + selIncomes.length + selInvestments.length + selCash.length === 0 ? (
+            sel && <p className="text-sm text-slate-400">Sin movimientos ese día.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              {selIncomes.map((e) => (
+                <li key={e.id} className="flex items-center gap-2 py-2">
+                  <span aria-hidden>{catById(e.categoryId)?.emoji ?? '💵'}</span>
+                  <button className="min-h-[44px] flex-1 text-left" onClick={() => setEditSheet({ kind: 'income', editing: e })}>
+                    {catById(e.categoryId)?.name ?? 'Ingreso'}{e.note ? ` · ${e.note}` : ''}
+                  </button>
+                  <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">+{fmtMoney(e.amount)}</span>
+                </li>
+              ))}
+              {selExpenses.map((e) => (
+                <li key={e.id} className="flex items-center gap-2 py-2">
+                  <span aria-hidden>{catById(e.categoryId)?.emoji ?? '📦'}</span>
+                  <button className="min-h-[44px] flex-1 text-left" onClick={() => setEditSheet({ kind: 'expense', editing: e })}>
+                    {catById(e.categoryId)?.name ?? 'Gasto'}{e.note ? ` · ${e.note}` : ''}
+                  </button>
+                  <span className="font-semibold tabular-nums">-{fmtMoney(e.amount)}</span>
+                </li>
+              ))}
+              {selInvestments.map((i) => (
+                <li key={i.id} className="flex items-center gap-2 py-2">
+                  <span aria-hidden>📈</span>
+                  <span className="flex-1">{i.source === 'monthly_close' ? 'Inversión (cierre de mes)' : 'Inversión'}{i.note ? ` · ${i.note}` : ''}</span>
+                  <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{fmtMoney(i.amount)}</span>
+                </li>
+              ))}
+              {selCash.map((e) => (
+                <li key={e.id} className="flex items-center gap-2 py-2">
+                  <span aria-hidden>{e.kind === 'salary' ? '💼' : e.amount >= 0 ? '⬆️' : '⬇️'}</span>
+                  <span className="flex-1">{e.kind === 'salary' ? 'Pago del trabajo' : e.note ?? (e.amount >= 0 ? 'Depósito' : 'Retiro')}</span>
+                  <span className="font-semibold tabular-nums">{e.amount >= 0 ? '+' : ''}{fmtMoney(e.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
+      {editSheet && (
+        <ExpenseSheet key={editSheet.editing.id} open kind={editSheet.kind} editing={editSheet.editing} onClose={() => setEditSheet(null)} />
+      )}
+    </div>
   );
 }
