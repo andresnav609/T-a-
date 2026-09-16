@@ -23,15 +23,18 @@ npm run preview    # sirve el build localmente
 Stack: React + Vite + TypeScript, Tailwind CSS, Recharts, Dexie (IndexedDB),
 vite-plugin-pwa, Vitest.
 
-## Cómo mandarle la app a tu amigo
+## App desplegada 🚀
 
-La carpeta `dist/` es un sitio estático: se puede publicar gratis en cualquier
-hosting y tu amigo la **instala como app** desde el navegador.
+**https://andresnav609.github.io/T-a-/**
 
-1. **Netlify / Vercel / Cloudflare Pages** (recomendado): conecta este repo,
-   apunta el proyecto a la carpeta `my-first-investment/` con build
-   `npm run build` y directorio de salida `dist/`. Te da una URL https.
-2. Tu amigo abre la URL en su celular → menú del navegador →
+Desplegada en GitHub Pages desde la rama `gh-pages`. El workflow
+`.github/workflows/deploy-pages.yml` reconstruye y republica automáticamente
+en cada push que toque `my-first-investment/`.
+
+### Cómo mandarle la app a tu amigo
+
+1. Mándale la URL de arriba.
+2. Él la abre en su celular → menú del navegador →
    **"Agregar a pantalla de inicio"** (o "Instalar app"). Queda instalada,
    con icono y funcionando offline.
 3. Cada uno usa su propia instalación con su propio perfil. Para verse:
@@ -39,7 +42,8 @@ hosting y tu amigo la **instala como app** desde el navegador.
    **Pacto → Actualizar perfil de mi compañero**.
 
 > El build usa rutas relativas (`base: './'`), así que también funciona en
-> GitHub Pages o en cualquier subcarpeta.
+> Netlify/Vercel/Cloudflare Pages o cualquier subcarpeta si algún día quieren
+> moverla.
 
 ## Sincronización futura (Fase 2)
 
