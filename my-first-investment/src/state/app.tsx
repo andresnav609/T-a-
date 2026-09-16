@@ -211,7 +211,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         cycles: [] as CycleSummary[], currentCycle: null, todayComp: null,
         streak: { current: 0, best: 0, atRisk: false }, totalInvested: 0,
         monthlyInvestAvg: 0, savingsPct: null, pendingClose: null, pendingWeekly: null,
-        goalCtx: { totalInvested: 0, currentCarry: 0, savingsGoal: settings.savingsGoal, currentStreak: 0 } as GoalContext,
+        goalCtx: { totalInvested: 0, currentCarry: 0, savingsGoal: settings.savingsGoal, currentStreak: 0, cycleFraction: 0 } as GoalContext,
       };
     }
     const cycles = computeHistory({
@@ -244,6 +244,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       currentCarry: carry,
       savingsGoal: settings.savingsGoal,
       currentStreak: streak.current,
+      cycleFraction: currentCycle
+        ? (diffDays(currentCycle.start, today) + 1) / (diffDays(currentCycle.start, currentCycle.end) + 1)
+        : 0,
       partnerTotalInvested: raw.partnerSnapshot?.data.totalInvested,
     };
     return { cycles, currentCycle, todayComp, streak, totalInvested, monthlyInvestAvg, savingsPct, pendingClose, pendingWeekly, goalCtx };

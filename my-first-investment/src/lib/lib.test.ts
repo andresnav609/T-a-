@@ -164,7 +164,7 @@ describe('resumen semanal (7.6)', () => {
 });
 
 describe('metas (7.7)', () => {
-  const ctx = { totalInvested: 750, currentCarry: 0, savingsGoal: 300, currentStreak: 10 };
+  const ctx = { totalInvested: 750, currentCarry: 0, savingsGoal: 300, currentStreak: 10, cycleFraction: 0.5 };
   const goal = (over: Partial<Goal>): Goal => ({
     id: 'g', userId: 'u', type: 'total_invested', name: 'Meta', target: 1000,
     shared: false, status: 'active', createdAt: '2025-01-01', ...over,
@@ -177,6 +177,21 @@ describe('metas (7.7)', () => {
   it('compartida: tú 750, compañero 500, target 2,000 → 62.5%', () => {
     const g = goal({ shared: true, target: 2000 });
     expect(goalProgress(g, { ...ctx, partnerTotalInvested: 500 }).pct).toBe(62.5);
+  });
+
+  it('ahorro del mes recién creada NO está lograda: se prorratea por el ciclo', () => {
+    const g = goal({ type: 'monthly_savings', target: 300 });
+    // Mitad del ciclo, sin arrastre: 300 × 0.5 = 150 → 50%.
+    expect(goalProgress(g, ctx).pct).toBe(50);
+    // Día 1 del ciclo: casi nada acumulado.
+    expect(goalProgress(g, { ...ctx, cycleFraction: 1 / 30 }).pct).toBeLessThan(5);
+  });
+
+  it('ahorro del mes: el arrastre negativo se la come, el positivo la adelanta', () => {
+    const g = goal({ type: 'monthly_savings', target: 300 });
+    expect(goalProgress(g, { ...ctx, currentCarry: -50 }).value).toBe(100); // 150 − 50
+    expect(goalProgress(g, { ...ctx, currentCarry: -200 }).value).toBe(0); // nunca negativo
+    expect(goalProgress(g, { ...ctx, cycleFraction: 1, currentCarry: 40 }).pct).toBe(100); // fin de mes sobrado
   });
 });
 

@@ -76,3 +76,8 @@ siempre la más simple (como pide el documento).
     `<html>`); "Automático" sigue a `prefers-color-scheme` con listener.
 21. **Color de acento**: variable CSS `--accent` (por defecto el verde de la
     marca) que el color del perfil sobreescribe si el usuario lo activa.
+22. **Meta "Ahorro del mes" prorrateada** (corrige un bug reportado): el
+    progreso es `metaAhorro × fracción del ciclo transcurrida + arrastre`,
+    nunca < 0. Antes la meta configurada contaba completa desde el día 1 y
+    una meta recién creada aparecía "Lograda" al instante. Las metas
+    logradas ahora tienen botón "Reactivar".

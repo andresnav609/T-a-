@@ -7,6 +7,8 @@ export type GoalContext = {
   currentCarry: number; // arrastre actual del ciclo
   savingsGoal: number;
   currentStreak: number;
+  /** Fracción del ciclo transcurrida (días pasados / días del ciclo), 0–1. */
+  cycleFraction: number;
   /** Aportes del compañero (último snapshot) para metas compartidas. */
   partnerTotalInvested?: number;
 };
@@ -18,7 +20,11 @@ export function goalProgress(goal: Goal, ctx: GoalContext): { value: number; pct
       value = ctx.totalInvested + (goal.shared ? ctx.partnerTotalInvested ?? 0 : 0);
       break;
     case 'monthly_savings':
-      value = Math.max(ctx.currentCarry, 0) + ctx.savingsGoal;
+      // El ahorro se GANA conforme avanza el mes: la meta apartada se acumula
+      // día a día, y el arrastre suma (si vas sobrado) o resta (si te la
+      // estás comiendo). Nunca por debajo de 0. Así una meta recién creada
+      // no aparece "lograda" por adelantado.
+      value = Math.max(ctx.savingsGoal * ctx.cycleFraction + ctx.currentCarry, 0);
       break;
     case 'streak':
       value = ctx.currentStreak;

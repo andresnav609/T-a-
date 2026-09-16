@@ -101,6 +101,9 @@ export default function Investments({ goCalc }: { goCalc: () => void }) {
                 <span aria-hidden>🏆</span>
                 <p className="flex-1 font-medium">{g.name}</p>
                 <p className="text-xs text-emerald-600 dark:text-emerald-300">Lograda</p>
+                <Button variant="ghost" onClick={() => app.saveGoal({ ...g, status: 'active', achievedAt: undefined })}>
+                  Reactivar
+                </Button>
               </div>
             ))}
             {archivedGoals.length > 0 && (
