@@ -1,0 +1,62 @@
+# Decisiones de implementación
+
+Registro de decisiones tomadas donde la spec no definía la opción, eligiendo
+siempre la más simple (como pide el documento).
+
+## Estructura
+
+1. **La app vive en `my-first-investment/`** dentro del repo, porque la raíz ya
+   contenía otro proyecto (una invitación de boda). El build usa `base: './'`
+   para funcionar desde cualquier hosting estático o subcarpeta.
+2. **Capa de repositorio** en `src/data/repository.ts` (interfaz) +
+   `src/data/localRepository.ts` (Dexie). `getRepository()` en
+   `src/data/index.ts` es el único punto donde en Fase 2 se elegirá
+   `SupabaseRepository` sin tocar UI ni lógica.
+
+## Lógica
+
+3. **Días anteriores al inicio del pacto no generan arrastre.** Si el pacto
+   empieza a mitad de ciclo, el cálculo arranca en `pactStartDate` con
+   arrastre 0 (evita "dinero fantasma" acumulado por días donde la app no
+   existía).
+4. **El número grande de Hoy** es `disponible − gastado hoy` (lo que queda por
+   gastar ahora mismo), porque el objetivo de la spec es "saber cada día
+   cuánto puede gastar". El límite base, el arrastre de ayer y lo gastado se
+   muestran debajo.
+5. **% del mes ahorrado vs meta** = `(metaAhorro + min(arrastre, 0)) / metaAhorro`,
+   acotado a 0–100. La meta se aparta al inicio; solo el arrastre negativo la
+   erosiona. El arrastre positivo no infla el % (se refleja en la sugerencia
+   de inversión).
+6. **Promedio mensual invertido** = total invertido ÷ meses desde el inicio
+   del pacto (mínimo 1).
+7. **Snapshots de límites**: al abrir la app se congela el límite base de los
+   días ya transcurridos del ciclo actual. Así, cambiar parámetros a mitad de
+   ciclo recalcula solo desde hoy.
+8. **Hitos de racha** se celebran una sola vez; el último hito celebrado se
+   recuerda en `localStorage`.
+9. **Fecha estimada de logro** de metas de inversión: usa el promedio mensual
+   invertido al 10% anual (la calculadora permite explorar otras tasas).
+
+## Tarjeta de progreso (Fase 1)
+
+10. **"JSON firmado"** = hash FNV-1a del contenido. Detecta corrupción o
+    edición manual; la autenticidad real llega en Fase 2 con cuentas.
+11. **Con `amounts = false`**: el resumen semanal viaja con los montos en 0
+    (solo datos relativos: días bajo el límite, top categoría, % de cambio) y
+    las metas monetarias viajan con `target = 0` y solo el % de progreso.
+12. **QR no incluido** en Fase 1: se comparte por el menú nativo
+    (`navigator.share` con archivo) o descarga directa del `.json`. Es la
+    opción más simple y el archivo también sirve por WhatsApp/correo.
+
+## UX
+
+13. **Borrar en listas**: botón ✕ con confirmación en dos toques (en vez de
+    swipe), más simple y accesible. Borrar todos los datos pide doble
+    confirmación en modal, como pide la spec.
+14. **Reordenar categorías** con botones ↑/↓ (sin drag & drop).
+15. **Iconos PWA en SVG** (aceptados por navegadores modernos); si se quiere
+    máxima compatibilidad de instalación en Android antiguos, generar PNG
+    192/512 después.
+16. **Cierre de mes**: el modal aparece automáticamente al abrir la app tras
+    el fin del ciclo; "Ahora no" deja la tarjeta pendiente en Hoy (el ciclo
+    no se considera cerrado hasta confirmar).
