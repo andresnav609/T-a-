@@ -334,6 +334,92 @@ describe('Mi plata: contabilidad (todo balanceado)', () => {
   });
 });
 
+describe('predicciones (forecast)', () => {
+  // Historial sintético: 8 semanas gastando exactamente 10/día.
+  const flatHistory = Array.from({ length: 56 }, (_, i) => ({
+    date: `2025-0${i < 25 ? 7 : 8}-${String((i % 25) + 1).padStart(2, '0')}`,
+    spent: 10,
+  }));
+  const baseInput = {
+    history: flatHistory,
+    startCash: 500,
+    startInvested: 0,
+    weeklyPay: { amount: 100, weekday: 5 as const },
+    extraIncomeWeeklyMean: 0,
+    monthlyInvestment: 0,
+    investDayOfMonth: 1,
+    annualReturnPct: 0,
+    fallbackDailySpend: 10,
+    today: '2025-09-16',
+  };
+
+  it('gasto constante 10/día + pago semanal 100 → mediana ≈ balance esperado', async () => {
+    const { forecast } = await import('./forecast');
+    // 28 días: 500 − 280 de gasto + 4 pagos de 100 = 620.
+    const r = forecast({ ...baseInput, horizonDays: 28, sims: 500, seed: 7 });
+    expect(Math.abs(r.final.cash.p50 - 620)).toBeLessThan(40);
+    // El rango es honesto: p10 < p50 < p90.
+    expect(r.final.cash.p10).toBeLessThan(r.final.cash.p50);
+    expect(r.final.cash.p90).toBeGreaterThan(r.final.cash.p50);
+    expect(r.confidence).toBe('solid');
+  });
+
+  it('misma semilla → mismo resultado (reproducible)', async () => {
+    const { forecast } = await import('./forecast');
+    const a = forecast({ ...baseInput, horizonDays: 14, sims: 100, seed: 42 });
+    const b = forecast({ ...baseInput, horizonDays: 14, sims: 100, seed: 42 });
+    expect(a.final.cash.p50).toBe(b.final.cash.p50);
+  });
+
+  it('sin datos usa la configuración como prior (confianza "config")', async () => {
+    const { forecast } = await import('./forecast');
+    const r = forecast({ ...baseInput, history: [], horizonDays: 14, sims: 200, seed: 1 });
+    expect(r.confidence).toBe('config');
+    // 500 − 14×10 + 2×100 = 560 aprox.
+    expect(Math.abs(r.final.cash.p50 - 560)).toBeLessThan(60);
+  });
+
+  it('la inversión mensual mueve plata a invertido (patrimonio se conserva)', async () => {
+    const { forecast } = await import('./forecast');
+    const r = forecast({
+      ...baseInput, weeklyPay: null, monthlyInvestment: 200, investDayOfMonth: 1,
+      horizonDays: 30, sims: 300, seed: 3,
+    });
+    // Patrimonio esperado: 500 − 300 gastados = 200 (la inversión no lo cambia).
+    expect(Math.abs(r.final.patrimonio.p50 - 200)).toBeLessThan(45);
+    // Pero la plata líquida sí baja por la inversión además del gasto.
+    expect(r.final.cash.p50).toBeLessThan(r.final.patrimonio.p50);
+  });
+
+  it('daysToTarget: ahorrar más por día acerca la meta', async () => {
+    const { daysToTarget } = await import('./forecast');
+    const base = { ...baseInput, weeklyPay: { amount: 120, weekday: 5 as const } }; // ahorra ~50/sem
+    const normal = daysToTarget(base, 1000);
+    const saving = daysToTarget(base, 1000, 3); // gastando $3 menos al día
+    expect(normal).not.toBeNull();
+    expect(saving).not.toBeNull();
+    expect(saving!).toBeLessThan(normal!);
+  });
+
+  it('meta inalcanzable → null', async () => {
+    const { daysToTarget } = await import('./forecast');
+    const broke = { ...baseInput, weeklyPay: { amount: 10, weekday: 5 as const } }; // gasta más de lo que entra
+    expect(daysToTarget(broke, 1e9)).toBeNull();
+  });
+
+  it('insights detectan el día de más gasto', async () => {
+    const { buildInsights } = await import('./forecast');
+    // 6 semanas: sábados 40, resto 10.
+    const hist = Array.from({ length: 42 }, (_, i) => {
+      const date = `2025-08-${String(i + 1).padStart(2, '0')}`;
+      const wd = new Date(date + 'T00:00').getDay();
+      return { date: i < 31 ? date : `2025-09-${String(i - 30).padStart(2, '0')}`, spent: wd === 6 ? 40 : 10, carry: wd === 6 ? -5 : 5 };
+    });
+    const insights = buildInsights({ history: hist, categorySpend: [] });
+    expect(insights.some((x) => x.text.includes('sábado'))).toBe(true);
+  });
+});
+
 describe('ciclos y semanas (fechas)', () => {
   it('ciclo con inicio el 1 cubre el mes calendario', () => {
     expect(cycleStartFor('2025-09-16', 1)).toBe('2025-09-01');

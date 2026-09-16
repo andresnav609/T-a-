@@ -108,3 +108,22 @@ siempre la más simple (como pide el documento).
     semáforo) y todos sus movimientos (gastos e ingresos editables al tocar,
     inversiones y movimientos de plata). Conserva los colores y el resumen
     de racha.
+
+## Predicciones "Tu futuro" (ronda 5, pedida por el usuario)
+
+29. **Motor local, no ML en la nube**: predicción estadística + Monte Carlo
+    (400 simulaciones, RNG sembrado para reproducibilidad) corriendo en el
+    celular. Nada sale del dispositivo. `src/lib/forecast.ts`.
+30. **Modelo de gasto**: media y desviación por día de semana con
+    encogimiento hacia la media global, prior de configuración (límite base)
+    con peso de 7 días para funcionar desde el día 1, tendencia lineal
+    amortiguada al 50% y acotada a ±2%/día. Solo pesan las últimas 8 semanas.
+31. **Ingresos**: pagos observados (eventos 'salary') mandan sobre el monto
+    configurado y sobre salario/52. Ingresos extra = promedio semanal de las
+    últimas 8 semanas. Inversión mensual = promedio de los últimos 3 cierres
+    (o la meta de ahorro si no hay cierres).
+32. **Rangos honestos**: se muestra p50 con banda p10–p90 (abanico) y
+    etiqueta de confianza según días de datos (config <7, aprendiendo <28,
+    sólida 28+). Aviso si el escenario pesimista cae a negativo.
+33. **Metas**: fecha de cruce con el camino esperado determinista (hasta 10
+    años), más la variante "gastando $2 menos al día".

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useApp } from '../state/app';
 import { Card, Button, Sheet, Field, NumberInput, EmptyState, inputCls } from '../components/ui';
 import { fmtMoney, timeAgo } from '../lib/format';
+import { ForecastSection } from './Forecast';
 
 /** Pantalla completa de la pestaña Plata. */
 export default function CashScreen() {
@@ -79,6 +80,8 @@ export default function CashScreen() {
         </p>
         <CashLedgerList />
       </Card>
+
+      <ForecastSection />
     </>
   );
 
