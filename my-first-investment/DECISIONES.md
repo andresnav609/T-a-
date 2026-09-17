@@ -151,3 +151,12 @@ siempre la más simple (como pide el documento).
     aportes − compras + ventas = efectivo en el broker. Si da negativo
     (compraste más de lo aportado) lo marca como discrepancia y ofrece
     anotar el aporte faltante con un toque.
+39. **Pestaña Portafolio en Inversión** (ronda 7): sub-pestañas Resumen /
+    Portafolio (como en Historial). Portafolio trae: valor del portafolio
+    día a día con selector 1S/1M/3M/1A/Todo, ganancia en el tiempo
+    (valor + ventas − aportado, área verde/roja sobre/bajo cero),
+    comparativa de posiciones en % desde su compra (máx. 6, por aporte), y
+    gráfica individual al tocar una posición (precio desde ~2 semanas antes
+    de la compra, punto de compra y línea punteada del precio de entrada).
+    Las vendidas cuentan en la historia hasta su venta (decisión del
+    usuario); la ganancia incluye lo realizado.

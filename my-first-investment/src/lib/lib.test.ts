@@ -489,6 +489,28 @@ describe('portafolio de acciones', () => {
     expect(r.brokerCash).toBe(-80);
   });
 
+  it('línea de tiempo: las vendidas cuentan hasta su venta y la ganancia incluye lo realizado', async () => {
+    const { portfolioTimeline } = await import('./stocks');
+    // 1 acción de VOO comprada el 10 a 100, vendida el 12 a 104.
+    const tl = portfolioTimeline([pos({ soldDate: '2025-09-12', soldPrice: 104 })], prices);
+    const by = (d: string) => tl.find((x) => x.date === d)!;
+    expect(by('2025-09-10').value).toBe(100);
+    expect(by('2025-09-10').gain).toBe(0);
+    expect(by('2025-09-11').value).toBe(102);
+    expect(by('2025-09-11').gain).toBe(2);
+    // Día de la venta: ya no la tienes, pero la ganancia realizada queda.
+    expect(by('2025-09-12').value).toBe(0);
+    expect(by('2025-09-12').gain).toBe(4);
+    expect(by('2025-09-15').gain).toBe(4);
+  });
+
+  it('serie en % de una posición desde su compra', async () => {
+    const { positionPctSeries } = await import('./stocks');
+    const s = positionPctSeries(pos({}), prices);
+    expect(s[0]).toEqual({ date: '2025-09-10', pct: 0 });
+    expect(s[s.length - 1]).toEqual({ date: '2025-09-15', pct: 10 });
+  });
+
   it('sin precios aún, la posición no inventa valor', async () => {
     const { buildPortfolio } = await import('./stocks');
     const pf = buildPortfolio([pos({ symbol: 'TSLA' })], prices);

@@ -3,13 +3,21 @@
 // "de tu bolsillo" vs "valor hoy", sin tocar la cuenta de banco.
 
 import { useEffect, useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  ComposedChart, Area, ReferenceLine, ReferenceDot, Legend,
+} from 'recharts';
 import { useApp } from '../state/app';
-import { Card, Button, Sheet, Field, NumberInput, EmptyState, inputCls, useConfirm } from '../components/ui';
+import { Card, Button, Sheet, Field, NumberInput, EmptyState, inputCls, useConfirm, Chip } from '../components/ui';
 import { fmtMoney, fmtMoneyShort, fmtDateShort, timeAgo } from '../lib/format';
-import { buildPortfolio, priceOn, parsePricesFile, brokerReconciliation } from '../lib/stocks';
-import { todayISO } from '../lib/dates';
+import {
+  buildPortfolio, priceOn, parsePricesFile, brokerReconciliation,
+  portfolioTimeline, positionPctSeries,
+} from '../lib/stocks';
+import { addDays, todayISO } from '../lib/dates';
 import type { PricesFile, StockPosition } from '../lib/types';
+
+const SERIES_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444'];
 
 /** Precios: red primero (una vez por sesión), caché local como respaldo. */
 function usePrices(): { prices: PricesFile | null; offline: boolean } {
@@ -255,6 +263,7 @@ function PositionSheet({ position, prices, onClose }: { position: StockPosition;
 
   return (
     <Sheet open onClose={onClose} title={`${position.symbol} · ${position.shares.toFixed(4)} acciones`}>
+      <PositionChart position={position} prices={prices} />
       <div className="mb-3 grid grid-cols-2 gap-2 text-center text-sm">
         <div className="rounded-xl bg-slate-50 p-2 dark:bg-slate-800">
           <p className="text-xs text-slate-400">Compraste</p>
@@ -304,5 +313,227 @@ function PositionSheet({ position, prices, onClose }: { position: StockPosition;
         {pendingDelete === position.id ? '¿Seguro? Toca otra vez' : 'Borrar posición'}
       </Button>
     </Sheet>
+  );
+}
+
+// ── Pestaña "Portafolio" de Inversión: las gráficas ──────────────────────
+
+const PERIODS: { label: string; days: number | null }[] = [
+  { label: '1S', days: 7 },
+  { label: '1M', days: 30 },
+  { label: '3M', days: 91 },
+  { label: '1A', days: 365 },
+  { label: 'Todo', days: null },
+];
+
+export function PortfolioCharts() {
+  const app = useApp();
+  const { prices, offline } = usePrices();
+  const [period, setPeriod] = useState<number | null>(91);
+  const [posSheet, setPosSheet] = useState<StockPosition | null>(null);
+
+  const timeline = useMemo(
+    () => portfolioTimeline(app.stockPositions, prices),
+    [app.stockPositions, prices],
+  );
+  const windowed = useMemo(() => {
+    if (period === null) return timeline;
+    const cutoff = addDays(todayISO(), -period);
+    return timeline.filter((t) => t.date >= cutoff);
+  }, [timeline, period]);
+
+  const pf = useMemo(() => buildPortfolio(app.stockPositions, prices), [app.stockPositions, prices]);
+
+  // Comparativa: hasta 6 posiciones (las de mayor aporte), en % desde su compra.
+  const compare = useMemo(() => {
+    if (!prices) return { data: [] as Record<string, number | string>[], keys: [] as string[] };
+    const top = [...app.stockPositions]
+      .sort((a, b) => b.amountInvested - a.amountInvested)
+      .slice(0, 6);
+    const cutoff = period === null ? '0000' : addDays(todayISO(), -period);
+    const byDate = new Map<string, Record<string, number | string>>();
+    const keys: string[] = [];
+    for (const p of top) {
+      const key = `${p.symbol} ${fmtDateShort(p.buyDate)}`;
+      keys.push(key);
+      for (const { date, pct } of positionPctSeries(p, prices)) {
+        if (date < cutoff) continue;
+        const row = byDate.get(date) ?? { date };
+        row[key] = pct;
+        byDate.set(date, row);
+      }
+    }
+    const data = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return { data, keys };
+  }, [app.stockPositions, prices, period]);
+
+  if (app.stockPositions.length === 0) {
+    return (
+      <Card>
+        <EmptyState emoji="📈" text="Registra tu primera compra en Resumen → Mis acciones y aquí verás cómo sube y baja tu portafolio día a día." />
+      </Card>
+    );
+  }
+  if (timeline.length === 0) {
+    return (
+      <Card>
+        <EmptyState emoji="🌙" text={offline ? 'Sin conexión y sin precios guardados todavía.' : 'Los precios llegan con la corrida nocturna del robot; vuelve mañana y verás tus gráficas.'} />
+      </Card>
+    );
+  }
+
+  const last = timeline[timeline.length - 1];
+  const gainPct = last.invested > 0 ? Math.round((last.gain / last.invested) * 1000) / 10 : null;
+  const valueData = windowed.map((t) => ({ fecha: fmtDateShort(t.date), valor: t.value }));
+  const gainData = windowed.map((t) => ({
+    fecha: fmtDateShort(t.date),
+    ganancia: t.gain,
+    pos: Math.max(t.gain, 0),
+    neg: Math.min(t.gain, 0),
+  }));
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Card>
+        {/* Encabezado: valor y ganancia en $ y % */}
+        <div className="text-center">
+          <p className="text-sm text-slate-500">Tu portafolio hoy</p>
+          <p className="text-4xl font-extrabold tabular-nums" style={{ color: 'var(--accent)' }}>
+            {fmtMoney(pf.currentValue)}
+          </p>
+          <p className={`text-sm font-semibold tabular-nums ${last.gain >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+            {last.gain >= 0 ? '▲' : '▼'} {fmtMoney(Math.abs(last.gain))}{gainPct !== null ? ` (${last.gain >= 0 ? '+' : '−'}${Math.abs(gainPct)}%)` : ''} en total
+          </p>
+          {pf.pricesDate && (
+            <p className="mt-0.5 text-xs text-slate-400">precios del {fmtDateShort(pf.pricesDate)}{offline ? ' · sin conexión' : ''}</p>
+          )}
+        </div>
+
+        <div className="-mx-1 mt-2 flex justify-center gap-2 overflow-x-auto px-1 pb-1">
+          {PERIODS.map((p) => (
+            <Chip key={p.label} selected={period === p.days} onClick={() => setPeriod(p.days)}>{p.label}</Chip>
+          ))}
+        </div>
+
+        {/* Valor del portafolio día a día */}
+        <div className="mt-1 h-44">
+          <ResponsiveContainer>
+            <LineChart data={valueData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+              <XAxis dataKey="fecha" tick={{ fontSize: 10 }} interval="preserveStartEnd" tickLine={false} />
+              <YAxis tick={{ fontSize: 10 }} width={48} tickFormatter={(v) => fmtMoneyShort(v)} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
+              <Tooltip formatter={(v: number) => fmtMoney(v)} />
+              <Line dataKey="valor" stroke="var(--accent)" strokeWidth={2} dot={false} name="valor" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+      {/* Ganancia / pérdida en el tiempo */}
+      <Card>
+        <p className="mb-1 font-semibold">¿Cuánto voy ganando?</p>
+        <p className="mb-1 text-xs text-slate-400">Valor + ventas − lo aportado. Verde arriba de cero, rojo abajo.</p>
+        <div className="h-36">
+          <ResponsiveContainer>
+            <ComposedChart data={gainData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+              <XAxis dataKey="fecha" tick={{ fontSize: 10 }} interval="preserveStartEnd" tickLine={false} />
+              <YAxis tick={{ fontSize: 10 }} width={48} tickFormatter={(v) => fmtMoneyShort(v)} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
+              <Tooltip formatter={(v: number, name: string) => (name === 'ganancia' ? [fmtMoney(v), 'ganancia'] : [null as unknown as string, ''])} />
+              <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+              <Area dataKey="pos" stroke="none" fill="#10b981" fillOpacity={0.25} name="pos" legendType="none" />
+              <Area dataKey="neg" stroke="none" fill="#ef4444" fillOpacity={0.25} name="neg" legendType="none" />
+              <Line dataKey="ganancia" stroke="var(--accent)" strokeWidth={2} dot={false} name="ganancia" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+      {/* Comparativa entre acciones */}
+      {compare.keys.length >= 2 && (
+        <Card>
+          <p className="mb-1 font-semibold">¿Cuál rinde mejor?</p>
+          <p className="mb-1 text-xs text-slate-400">Cada posición en % desde su compra.</p>
+          <div className="h-44">
+            <ResponsiveContainer>
+              <LineChart data={compare.data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" tickLine={false} tickFormatter={(d) => fmtDateShort(String(d))} />
+                <YAxis tick={{ fontSize: 10 }} width={40} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
+                <Tooltip formatter={(v: number) => `${v}%`} labelFormatter={(d) => fmtDateShort(String(d))} />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {compare.keys.map((k, i) => (
+                  <Line key={k} dataKey={k} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} strokeWidth={2} dot={false} connectNulls />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      {/* Posiciones: tocar una abre su gráfica individual */}
+      <Card>
+        <p className="mb-1 font-semibold">Tus posiciones</p>
+        <p className="mb-1 text-xs text-slate-400">Toca una para ver su gráfica desde tu compra.</p>
+        <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+          {[...app.stockPositions]
+            .sort((a, b) => (a.soldDate ? 1 : 0) - (b.soldDate ? 1 : 0) || b.amountInvested - a.amountInvested)
+            .map((p) => {
+              const view = pf.positions.find((v) => v.position.id === p.id)!;
+              return (
+                <li key={p.id}>
+                  <button className={`flex min-h-[44px] w-full items-center gap-2 py-1.5 text-left ${p.soldDate ? 'opacity-60' : ''}`} onClick={() => setPosSheet(p)}>
+                    <span className="font-bold">{p.symbol}</span>
+                    <span className="flex-1 text-xs text-slate-400">
+                      {p.soldDate ? `vendida ${fmtDateShort(p.soldDate)}` : `desde ${fmtDateShort(p.buyDate)}`}
+                    </span>
+                    {view.gainPct !== null && (
+                      <span className={`tabular-nums ${view.gain! >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                        {view.gain! >= 0 ? '+' : ''}{view.gainPct}%
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+        </ul>
+      </Card>
+
+      {posSheet && <PositionSheet position={posSheet} prices={prices} onClose={() => setPosSheet(null)} />}
+    </div>
+  );
+}
+
+/** Gráfica individual: precio desde la compra, con marca y línea de tu precio. */
+export function PositionChart({ position, prices }: { position: StockPosition; prices: PricesFile | null }) {
+  const series = prices?.tickers[position.symbol]?.series ?? [];
+  const from = addDays(position.buyDate, -14);
+  const to = position.soldDate ?? todayISO();
+  const data = series
+    .filter(([d]) => d >= from && d <= to)
+    .map(([d, c]) => ({ date: d, precio: c }));
+  if (data.length < 2) return null;
+  const lastClose = data[data.length - 1].precio;
+  const gain = position.shares * ((position.soldPrice ?? lastClose) - position.buyPrice);
+  const gainPct = Math.round(((position.soldPrice ?? lastClose) / position.buyPrice - 1) * 1000) / 10;
+  return (
+    <div className="mb-3">
+      <p className={`mb-1 text-center text-sm font-semibold tabular-nums ${gain >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+        {gain >= 0 ? '▲' : '▼'} {fmtMoney(Math.abs(gain))} ({gain >= 0 ? '+' : '−'}{Math.abs(gainPct)}%) desde tu compra
+      </p>
+      <div className="h-36">
+        <ResponsiveContainer>
+          <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" tickLine={false} tickFormatter={(d) => fmtDateShort(String(d))} />
+            <YAxis tick={{ fontSize: 10 }} width={44} tickFormatter={(v) => fmtMoneyShort(v)} domain={['auto', 'auto']} tickLine={false} axisLine={false} />
+            <Tooltip formatter={(v: number) => fmtMoney(v)} labelFormatter={(d) => fmtDateShort(String(d))} />
+            <ReferenceLine y={position.buyPrice} stroke="#94a3b8" strokeDasharray="4 4" />
+            <Line dataKey="precio" stroke="var(--accent)" strokeWidth={2} dot={false} name="precio" />
+            <ReferenceDot x={position.buyDate} y={position.buyPrice} r={5} fill="var(--accent)" stroke="#fff" strokeWidth={2} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-center text-xs text-slate-400">
+        ● tu compra ({fmtMoney(position.buyPrice)}/acción) · línea punteada = tu precio de entrada
+      </p>
+    </div>
   );
 }

@@ -8,7 +8,7 @@ import { Card, Button, Sheet, Field, NumberInput, ProgressBar, EmptyState, useCo
 import { fmtMoney, fmtMoneyShort, fmtDateShort } from '../lib/format';
 import { monthsToInvestmentGoal } from '../lib/goals';
 import { todayISO, addDays } from '../lib/dates';
-import { StocksSection } from './Stocks';
+import { StocksSection, PortfolioCharts } from './Stocks';
 import type { Goal, Investment } from '../lib/types';
 
 export default function Investments({ goCalc }: { goCalc: () => void }) {
@@ -17,6 +17,7 @@ export default function Investments({ goCalc }: { goCalc: () => void }) {
   const [goalSheet, setGoalSheet] = useState<null | { editing?: Goal }>(null);
   const [pendingDelete, confirmDelete] = useConfirm();
   const [showArchived, setShowArchived] = useState(false);
+  const [subtab, setSubtab] = useState<'resumen' | 'portafolio'>('resumen');
 
   const byMonth = useMemo(() => {
     const map = new Map<string, number>();
@@ -34,6 +35,12 @@ export default function Investments({ goCalc }: { goCalc: () => void }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        <Chip selected={subtab === 'resumen'} onClick={() => setSubtab('resumen')}>Resumen</Chip>
+        <Chip selected={subtab === 'portafolio'} onClick={() => setSubtab('portafolio')}>Portafolio 📈</Chip>
+      </div>
+
+      {subtab === 'portafolio' ? <PortfolioCharts /> : (<>
       <Card className="text-center">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total invertido</p>
         <p className="my-1 text-5xl font-extrabold tabular-nums text-emerald-500">{fmtMoney(app.totalInvested)}</p>
@@ -123,6 +130,8 @@ export default function Investments({ goCalc }: { goCalc: () => void }) {
           </div>
         )}
       </Card>
+
+      </>)}
 
       {invSheet && <InvestmentSheet editing={invSheet.editing} onClose={() => setInvSheet(null)} />}
       {goalSheet && <GoalSheet editing={goalSheet.editing} onClose={() => setGoalSheet(null)} />}

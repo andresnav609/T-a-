@@ -116,6 +116,66 @@ export function buildPortfolio(
   };
 }
 
+/** Línea de tiempo del portafolio, incluyendo posiciones vendidas HASTA su
+ *  venta (tu historia real). Por fecha:
+ *  value = lo que valían tus posiciones vigentes ese día;
+ *  gain  = value + ventas acumuladas − compras acumuladas (ganancia total,
+ *          realizada + no realizada). */
+export type TimelinePoint = { date: string; value: number; gain: number; invested: number };
+
+export function portfolioTimeline(
+  positions: StockPosition[],
+  prices: PricesFile | null,
+): TimelinePoint[] {
+  if (!prices || positions.length === 0) return [];
+  const dates = new Set<string>();
+  for (const p of positions) {
+    for (const [d] of prices.tickers[p.symbol]?.series ?? []) dates.add(d);
+  }
+  const firstBuy = positions.reduce((m, p) => (p.buyDate < m ? p.buyDate : m), '9999-12-31');
+  const window = [...dates].sort().filter((d) => d >= firstBuy);
+  const out: TimelinePoint[] = [];
+  for (const date of window) {
+    let value = 0;
+    let buys = 0;
+    let proceeds = 0;
+    for (const p of positions) {
+      if (p.buyDate <= date) buys += p.amountInvested;
+      if (p.soldDate && p.soldPrice != null && p.soldDate <= date) proceeds += p.shares * p.soldPrice;
+      const held = p.buyDate <= date && (!p.soldDate || date < p.soldDate);
+      if (held) {
+        const c = priceOn(prices.tickers[p.symbol]?.series ?? [], date);
+        if (c !== null) value += p.shares * c;
+      }
+    }
+    if (buys > 0) {
+      out.push({
+        date,
+        value: round2(value),
+        gain: round2(value + proceeds - buys),
+        invested: round2(buys - proceeds),
+      });
+    }
+  }
+  return out;
+}
+
+/** % de cambio de una posición desde su compra (hasta su venta si aplica). */
+export function positionPctSeries(
+  p: StockPosition,
+  prices: PricesFile | null,
+): { date: string; pct: number }[] {
+  const series = prices?.tickers[p.symbol]?.series ?? [];
+  if (p.buyPrice <= 0) return [];
+  const out: { date: string; pct: number }[] = [];
+  for (const [date, close] of series) {
+    if (date < p.buyDate) continue;
+    if (p.soldDate && date > p.soldDate) break;
+    out.push({ date, pct: round1((close / p.buyPrice - 1) * 100) });
+  }
+  return out;
+}
+
 /** Cuadre de inversión: aportes anotados vs compras de acciones.
  *  brokerCash = aportes − compras + ventas. Negativo = compraste más de lo
  *  que anotaste como aporte (falta anotar un aporte, o sobró una compra). */
