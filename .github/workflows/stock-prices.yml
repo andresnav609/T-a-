@@ -1,0 +1,46 @@
+name: Precios nocturnos de acciones
+
+on:
+  schedule:
+    # 03:00 UTC ≈ 10 pm Panamá, horas después del cierre del mercado de EE. UU.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Mismo grupo que el deploy de Pages para no pisarse al empujar a gh-pages.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      # El cron corre desde la rama por defecto, pero el script y la lista de
+      # tickers viven en la rama de la app.
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/data-sync-share-prototype-rvhc0v
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Descargar precios de cierre
+        run: node my-first-investment/scripts/fetch-prices.mjs site/prices.json site/prices.json
+      - name: Publicar en gh-pages
+        run: |
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prices.json
+          if git diff --cached --quiet; then
+            echo "Sin cambios de precios."
+          else
+            git commit -m "Actualizar precios de acciones ($(date -u +%F))"
+            git push
+          fi
