@@ -126,6 +126,30 @@ export type Investment = {
   createdAt?: string; // para ordenar contra los cuadres de Mi plata
 };
 
+/** Posición en una acción/ETF. Registrada por monto en $ (fracciones de
+ *  acción); se conserva hasta que el usuario la borre, vendida o no.
+ *  Separada de "Mi plata": no toca la cuenta de banco. */
+export type StockPosition = {
+  id: string;
+  userId: string;
+  symbol: string; // ticker, ej. "VOO"
+  amountInvested: number; // $ de tu bolsillo
+  buyDate: string; // YYYY-MM-DD
+  buyPrice: number; // precio de cierre usado en la compra
+  shares: number; // amountInvested / buyPrice (fraccional)
+  soldDate?: string;
+  soldPrice?: number;
+  note?: string;
+  createdAt: string;
+};
+
+/** Archivo de precios publicado cada noche por el workflow (prices.json). */
+export type PricesFile = {
+  v: 1;
+  updatedAt: string; // ISO datetime de la corrida
+  tickers: Record<string, { name?: string; series: [string, number][] }>; // [fecha, cierre]
+};
+
 /** Movimiento del libro de "Mi plata" (la cuenta única de efectivo/banco).
  *  'set' = cuadre: fija el saldo real en un momento dado (ancla del cálculo);
  *  'deposit' = depósito/retiro manual (monto con signo);

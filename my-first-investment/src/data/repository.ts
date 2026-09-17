@@ -5,7 +5,7 @@
 
 import type {
   Profile, Settings, Category, Expense, ExtraIncome, DaySnapshot,
-  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent,
+  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent, StockPosition,
 } from '../lib/types';
 
 export type BackupData = {
@@ -24,6 +24,7 @@ export type BackupData = {
   weeklySummaries: WeeklySummary[];
   partnerSnapshot: PartnerSnapshot | null;
   cashEvents?: CashEvent[];
+  stockPositions?: StockPosition[];
 };
 
 export interface Repository {
@@ -72,6 +73,11 @@ export interface Repository {
   listCashEvents(): Promise<CashEvent[]>;
   saveCashEvent(e: CashEvent): Promise<void>;
   deleteCashEvent(id: string): Promise<void>;
+
+  // Acciones (posiciones del portafolio; los precios llegan de prices.json)
+  listStockPositions(): Promise<StockPosition[]>;
+  saveStockPosition(p: StockPosition): Promise<void>;
+  deleteStockPosition(id: string): Promise<void>;
 
   // Pacto (Fase 1: snapshot importado del compañero)
   getPartnerSnapshot(): Promise<PartnerSnapshot | null>;

@@ -420,6 +420,66 @@ describe('predicciones (forecast)', () => {
   });
 });
 
+describe('portafolio de acciones', () => {
+  const prices: import('./types').PricesFile = {
+    v: 1,
+    updatedAt: '2025-09-16T03:00:00Z',
+    tickers: {
+      VOO: { series: [['2025-09-10', 100], ['2025-09-11', 102], ['2025-09-12', 104], ['2025-09-15', 110]] },
+      AAPL: { series: [['2025-09-10', 200], ['2025-09-15', 190]] },
+    },
+  };
+  const pos = (over: Partial<import('./types').StockPosition>): import('./types').StockPosition => ({
+    id: 'p1', userId: 'u', symbol: 'VOO', amountInvested: 100, buyDate: '2025-09-10',
+    buyPrice: 100, shares: 1, createdAt: '2025-09-10T12:00:00Z', ...over,
+  });
+
+  it('priceOn usa el cierre anterior si el mercado estaba cerrado', async () => {
+    const { priceOn } = await import('./stocks');
+    expect(priceOn(prices.tickers.VOO.series, '2025-09-13')).toBe(104); // sábado → viernes 12
+    expect(priceOn(prices.tickers.VOO.series, '2025-09-09')).toBeNull(); // antes del inicio
+  });
+
+  it('bolsillo vs valor actual, con ganancia', async () => {
+    const { buildPortfolio } = await import('./stocks');
+    // $100 compraron 1 acción a 100; hoy cierra a 110.
+    const pf = buildPortfolio([pos({})], prices);
+    expect(pf.invested).toBe(100);
+    expect(pf.currentValue).toBe(110);
+    expect(pf.gain).toBe(10);
+    expect(pf.gainPct).toBe(10);
+    expect(pf.pricesDate).toBe('2025-09-15');
+  });
+
+  it('una posición vendida congela su valor y no cuenta en el total activo', async () => {
+    const { buildPortfolio } = await import('./stocks');
+    const sold = pos({ id: 'p2', soldDate: '2025-09-12', soldPrice: 104 });
+    const pf = buildPortfolio([pos({}), sold], prices);
+    expect(pf.invested).toBe(100); // solo la activa
+    expect(pf.currentValue).toBe(110);
+    const soldView = pf.positions.find((v) => v.position.id === 'p2')!;
+    expect(soldView.currentValue).toBe(104);
+    expect(soldView.gain).toBe(4);
+  });
+
+  it('la historia del portafolio suma shares × cierre por día', async () => {
+    const { buildPortfolio } = await import('./stocks');
+    const pf = buildPortfolio([pos({ shares: 2, amountInvested: 200 })], prices);
+    expect(pf.history.find((h) => h.date === '2025-09-11')?.value).toBe(204);
+    expect(pf.history.find((h) => h.date === '2025-09-15')?.value).toBe(220);
+    // No hay valor antes de la compra.
+    expect(pf.history.find((h) => h.date === '2025-09-09')).toBeUndefined();
+  });
+
+  it('sin precios aún, la posición no inventa valor', async () => {
+    const { buildPortfolio } = await import('./stocks');
+    const pf = buildPortfolio([pos({ symbol: 'TSLA' })], prices);
+    expect(pf.positions[0].currentValue).toBeNull();
+    // El total usa lo aportado como aproximación mientras llegan precios.
+    expect(pf.currentValue).toBe(100);
+  });
+});
+
 describe('ciclos y semanas (fechas)', () => {
   it('ciclo con inicio el 1 cubre el mes calendario', () => {
     expect(cycleStartFor('2025-09-16', 1)).toBe('2025-09-01');

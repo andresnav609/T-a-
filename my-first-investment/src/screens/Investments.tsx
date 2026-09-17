@@ -8,6 +8,7 @@ import { Card, Button, Sheet, Field, NumberInput, ProgressBar, EmptyState, useCo
 import { fmtMoney, fmtMoneyShort, fmtDateShort } from '../lib/format';
 import { monthsToInvestmentGoal } from '../lib/goals';
 import { todayISO, addDays } from '../lib/dates';
+import { StocksSection } from './Stocks';
 import type { Goal, Investment } from '../lib/types';
 
 export default function Investments({ goCalc }: { goCalc: () => void }) {
@@ -85,6 +86,8 @@ export default function Investments({ goCalc }: { goCalc: () => void }) {
           </ul>
         )}
       </Card>
+
+      <StocksSection />
 
       <Card>
         <div className="mb-2 flex items-center justify-between">

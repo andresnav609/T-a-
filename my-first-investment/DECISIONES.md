@@ -127,3 +127,22 @@ siempre la más simple (como pide el documento).
     sólida 28+). Aviso si el escenario pesimista cae a negativo.
 33. **Metas**: fecha de cruce con el camino esperado determinista (hasta 10
     años), más la variante "gastando $2 menos al día".
+
+## Acciones con precios nocturnos (ronda 6, pedida por el usuario)
+
+34. **Robot nocturno en GitHub Actions** (no "Claude corriendo de noche"):
+    cron diario 03:00 UTC descarga cierres de Stooq (gratis, sin API key)
+    para los tickers de `stocks/tickers.json` y publica `prices.json` en
+    gh-pages. El deploy usa `keep_files: true` para no borrarlo. El cron solo
+    corre desde la rama por defecto del repo, así que el YAML vive ahí y hace
+    checkout de la rama de la app para el script.
+35. **Posiciones privadas, precios públicos**: al repo solo van los tickers;
+    cuánto y cuándo compró cada quien queda en su celular (Dexie v3,
+    `stockPositions`, incluido en el respaldo).
+36. **Registro por monto en $** (fracciones): precio prellenado con el cierre
+    de la fecha de compra, corregible con el del broker. Vendida = congelada
+    con su precio de venta; se conserva hasta borrarla.
+37. **Separado de Mi plata** (decisión del usuario): la sección muestra
+    "de tu bolsillo" vs "valor hoy" y no toca la cuenta de banco ni las
+    predicciones. Ante fallo de un ticker, el robot conserva la serie
+    anterior; la app cachea el último prices.json para funcionar offline.

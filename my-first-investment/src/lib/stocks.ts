@@ -1,0 +1,134 @@
+// Portafolio de acciones: cruza tus posiciones (locales y privadas) con los
+// precios de cierre que el robot nocturno publica en prices.json.
+// Separado de "Mi plata": es informativo, no toca la cuenta de banco.
+
+import type { StockPosition, PricesFile } from './types';
+
+/** Cierre en la fecha dada o el último anterior (mercado cerrado los findes). */
+export function priceOn(series: [string, number][], date: string): number | null {
+  let best: number | null = null;
+  for (const [d, close] of series) {
+    if (d <= date) best = close;
+    else break; // la serie viene ordenada por fecha
+  }
+  return best;
+}
+
+export function lastPrice(series: [string, number][]): { date: string; close: number } | null {
+  if (series.length === 0) return null;
+  const [date, close] = series[series.length - 1];
+  return { date, close };
+}
+
+export type PositionView = {
+  position: StockPosition;
+  currentPrice: number | null;
+  currentValue: number | null; // null si no hay precio (o valor de venta si vendida)
+  gain: number | null;
+  gainPct: number | null;
+};
+
+export type PortfolioView = {
+  positions: PositionView[];
+  /** Solo posiciones activas (no vendidas). */
+  invested: number; // de tu bolsillo
+  currentValue: number; // valor de mercado hoy
+  gain: number;
+  gainPct: number | null;
+  pricesDate: string | null; // fecha del último cierre disponible
+  /** Valor del portafolio activo por día (para la gráfica), últimos `days`. */
+  history: { date: string; value: number }[];
+};
+
+export function buildPortfolio(
+  positions: StockPosition[],
+  prices: PricesFile | null,
+  historyDays = 90,
+): PortfolioView {
+  const views: PositionView[] = positions.map((p) => {
+    if (p.soldDate && p.soldPrice != null) {
+      const value = p.shares * p.soldPrice;
+      return {
+        position: p,
+        currentPrice: p.soldPrice,
+        currentValue: round2(value),
+        gain: round2(value - p.amountInvested),
+        gainPct: p.amountInvested > 0 ? round1(((value - p.amountInvested) / p.amountInvested) * 100) : null,
+      };
+    }
+    const series = prices?.tickers[p.symbol]?.series ?? [];
+    const last = lastPrice(series);
+    if (!last) return { position: p, currentPrice: null, currentValue: null, gain: null, gainPct: null };
+    const value = p.shares * last.close;
+    return {
+      position: p,
+      currentPrice: last.close,
+      currentValue: round2(value),
+      gain: round2(value - p.amountInvested),
+      gainPct: p.amountInvested > 0 ? round1(((value - p.amountInvested) / p.amountInvested) * 100) : null,
+    };
+  });
+
+  const active = views.filter((v) => !v.position.soldDate);
+  const invested = round2(active.reduce((s, v) => s + v.position.amountInvested, 0));
+  const currentValue = round2(active.reduce((s, v) => s + (v.currentValue ?? v.position.amountInvested), 0));
+
+  // Historia del portafolio: para cada fecha del ticker más largo, suma
+  // shares × cierre de cada posición activa comprada en o antes de esa fecha.
+  const history: { date: string; value: number }[] = [];
+  if (prices && active.length > 0) {
+    const allDates = new Set<string>();
+    for (const v of active) {
+      for (const [d] of prices.tickers[v.position.symbol]?.series ?? []) allDates.add(d);
+    }
+    const dates = [...allDates].sort().slice(-historyDays);
+    for (const date of dates) {
+      let value = 0;
+      let any = false;
+      for (const v of active) {
+        if (v.position.buyDate > date) continue;
+        const close = priceOn(prices.tickers[v.position.symbol]?.series ?? [], date);
+        if (close !== null) {
+          value += v.position.shares * close;
+          any = true;
+        }
+      }
+      if (any) history.push({ date, value: round2(value) });
+    }
+  }
+
+  let pricesDate: string | null = null;
+  if (prices) {
+    for (const t of Object.values(prices.tickers)) {
+      const last = lastPrice(t.series);
+      if (last && (!pricesDate || last.date > pricesDate)) pricesDate = last.date;
+    }
+  }
+
+  return {
+    positions: views,
+    invested,
+    currentValue,
+    gain: round2(currentValue - invested),
+    gainPct: invested > 0 ? round1(((currentValue - invested) / invested) * 100) : null,
+    pricesDate,
+    history,
+  };
+}
+
+export function parsePricesFile(json: string): PricesFile | null {
+  try {
+    const obj = JSON.parse(json);
+    if (obj?.v !== 1 || typeof obj.tickers !== 'object') return null;
+    return obj as PricesFile;
+  } catch {
+    return null;
+  }
+}
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+function round1(n: number): number {
+  return Math.round((n + Number.EPSILON) * 10) / 10;
+}

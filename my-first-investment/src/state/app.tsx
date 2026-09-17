@@ -8,7 +8,7 @@ import { getRepository } from '../data';
 import type { BackupData } from '../data';
 import type {
   Profile, Settings, Category, Expense, ExtraIncome, DaySnapshot,
-  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent,
+  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent, StockPosition,
 } from '../lib/types';
 import { computeCashBalance, buildLedger, reconcileDiff, reconcileIsDue, latestSet, type LedgerRow } from '../lib/cash';
 import { computeHistory, finishedDays, type CycleSummary } from '../lib/history';
@@ -93,6 +93,7 @@ type AppState = {
   partnerSnapshot: PartnerSnapshot | null;
   daySnapshots: DaySnapshot[];
   cashEvents: CashEvent[];
+  stockPositions: StockPosition[];
   today: string;
   // Derivados
   cycles: CycleSummary[];
@@ -144,6 +145,8 @@ type AppActions = {
   addCashDeposit(amount: number, note?: string): Promise<void>;
   addCashSalary(amount: number): Promise<void>;
   deleteCashEvent(id: string): Promise<void>;
+  saveStockPosition(p: StockPosition): Promise<void>;
+  deleteStockPosition(id: string): Promise<void>;
   buildMyProgressCard(): ProgressCard | null;
   importPartnerCard(json: string): Promise<{ ok: boolean; error?: string }>;
   removePartner(): Promise<void>;
@@ -163,7 +166,7 @@ export function useApp() {
 
 type Raw = Pick<AppState,
   'profile' | 'settings' | 'categories' | 'expenses' | 'extraIncomes' | 'investments' |
-  'goals' | 'weeklySummaries' | 'monthCloses' | 'partnerSnapshot' | 'daySnapshots' | 'cashEvents'>;
+  'goals' | 'weeklySummaries' | 'monthCloses' | 'partnerSnapshot' | 'daySnapshots' | 'cashEvents' | 'stockPositions'>;
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const repo = getRepository();
@@ -183,15 +186,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     partnerSnapshot: null,
     daySnapshots: [],
     cashEvents: [],
+    stockPositions: [],
   });
 
   const load = useCallback(async (): Promise<Raw> => {
     const [profile, settings, categories, expenses, extraIncomes, investments, goals,
-      weeklySummaries, monthCloses, partnerSnapshot, cashEvents] = await Promise.all([
+      weeklySummaries, monthCloses, partnerSnapshot, cashEvents, stockPositions] = await Promise.all([
       repo.getProfile(), repo.getSettings(), repo.listCategories(), repo.listExpenses(),
       repo.listExtraIncomes(), repo.listInvestments(), repo.listGoals(),
       repo.listWeeklySummaries(), repo.listMonthCloses(), repo.getPartnerSnapshot(),
-      repo.listCashEvents(),
+      repo.listCashEvents(), repo.listStockPositions(),
     ]);
     const s = normalizeSettings(settings, profile?.id ?? 'local');
     const daySnapshots = profile
@@ -199,7 +203,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       : [];
     return {
       profile, settings: s, categories, expenses, extraIncomes, investments,
-      goals, weeklySummaries, monthCloses, partnerSnapshot, daySnapshots, cashEvents,
+      goals, weeklySummaries, monthCloses, partnerSnapshot, daySnapshots, cashEvents, stockPositions,
     };
   }, []);
 
@@ -530,6 +534,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const e = raw.cashEvents.find((x) => x.id === id);
       if (e?.kind === 'set') return; // los cuadres son el ancla: no se borran
       await repo.deleteCashEvent(id);
+      await refresh();
+    },
+
+    async saveStockPosition(p) {
+      await repo.saveStockPosition(p);
+      await refresh();
+    },
+    async deleteStockPosition(id) {
+      await repo.deleteStockPosition(id);
       await refresh();
     },
 

@@ -3,7 +3,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   Profile, Settings, Category, Expense, ExtraIncome, DaySnapshot,
-  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent,
+  MonthClose, Investment, Goal, WeeklySummary, PartnerSnapshot, CashEvent, StockPosition,
 } from '../lib/types';
 import type { Repository, BackupData } from './repository';
 
@@ -20,6 +20,7 @@ class MfiDatabase extends Dexie {
   weeklySummaries!: Table<WeeklySummary, string>;
   partnerSnapshots!: Table<PartnerSnapshot & { id: string }, string>;
   cashEvents!: Table<CashEvent, string>;
+  stockPositions!: Table<StockPosition, string>;
 
   constructor() {
     super('my-first-investment');
@@ -40,6 +41,10 @@ class MfiDatabase extends Dexie {
     // los datos existentes quedan intactos.
     this.version(2).stores({
       cashEvents: 'id, at',
+    });
+    // v3: posiciones de acciones. Migración aditiva.
+    this.version(3).stores({
+      stockPositions: 'id, symbol',
     });
   }
 }
@@ -148,6 +153,16 @@ export class LocalRepository implements Repository {
     await this.db.cashEvents.delete(id);
   }
 
+  async listStockPositions() {
+    return this.db.stockPositions.toArray();
+  }
+  async saveStockPosition(p: StockPosition) {
+    await this.db.stockPositions.put(p);
+  }
+  async deleteStockPosition(id: string) {
+    await this.db.stockPositions.delete(id);
+  }
+
   async getPartnerSnapshot() {
     const s = await this.db.partnerSnapshots.get('partner');
     if (!s) return null;
@@ -178,6 +193,7 @@ export class LocalRepository implements Repository {
       weeklySummaries: await this.db.weeklySummaries.toArray(),
       partnerSnapshot: await this.getPartnerSnapshot(),
       cashEvents: await this.db.cashEvents.toArray(),
+      stockPositions: await this.db.stockPositions.toArray(),
     };
   }
 
@@ -195,6 +211,7 @@ export class LocalRepository implements Repository {
       await this.db.goals.bulkPut(data.goals ?? []);
       await this.db.weeklySummaries.bulkPut(data.weeklySummaries ?? []);
       await this.db.cashEvents.bulkPut(data.cashEvents ?? []);
+      await this.db.stockPositions.bulkPut(data.stockPositions ?? []);
       if (data.partnerSnapshot) await this.db.partnerSnapshots.put({ ...data.partnerSnapshot, id: 'partner' });
     });
   }

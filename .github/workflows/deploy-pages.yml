@@ -43,4 +43,6 @@ jobs:
           publish_dir: my-first-investment/dist
           publish_branch: gh-pages
           enable_jekyll: false
+          # Conserva prices.json (lo publica el workflow nocturno de acciones).
+          keep_files: true
           commit_message: 'Deploy My First Investment'

@@ -1,0 +1,16 @@
+{
+  "_": "Tickers que el robot nocturno descarga. Para agregar uno, añade {symbol, name} aquí (símbolos de EE. UU.).",
+  "tickers": [
+    { "symbol": "VOO", "name": "Vanguard S&P 500 ETF" },
+    { "symbol": "SPY", "name": "SPDR S&P 500 ETF" },
+    { "symbol": "QQQ", "name": "Invesco Nasdaq-100 ETF" },
+    { "symbol": "VTI", "name": "Vanguard Total Stock Market ETF" },
+    { "symbol": "AAPL", "name": "Apple" },
+    { "symbol": "MSFT", "name": "Microsoft" },
+    { "symbol": "NVDA", "name": "Nvidia" },
+    { "symbol": "AMZN", "name": "Amazon" },
+    { "symbol": "GOOGL", "name": "Alphabet (Google)" },
+    { "symbol": "META", "name": "Meta" },
+    { "symbol": "TSLA", "name": "Tesla" }
+  ]
+}
