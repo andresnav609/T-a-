@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { useApp } from '../state/app';
 import { Card, Button, Sheet, Field, NumberInput, EmptyState, inputCls, useConfirm } from '../components/ui';
 import { fmtMoney, fmtMoneyShort, fmtDateShort, timeAgo } from '../lib/format';
-import { buildPortfolio, priceOn, parsePricesFile } from '../lib/stocks';
+import { buildPortfolio, priceOn, parsePricesFile, brokerReconciliation } from '../lib/stocks';
 import { todayISO } from '../lib/dates';
 import type { PricesFile, StockPosition } from '../lib/types';
 
@@ -50,6 +50,11 @@ export function StocksSection() {
   const pf = useMemo(() => buildPortfolio(app.stockPositions, prices), [app.stockPositions, prices]);
   const active = pf.positions.filter((v) => !v.position.soldDate);
   const sold = pf.positions.filter((v) => v.position.soldDate);
+  // Cuadre: aportes anotados (Total invertido) vs compras de acciones.
+  const recon = useMemo(
+    () => brokerReconciliation(app.totalInvested, app.stockPositions),
+    [app.totalInvested, app.stockPositions],
+  );
   const chart = pf.history.map((h) => ({ fecha: fmtDateShort(h.date), valor: h.value }));
 
   return (
@@ -116,6 +121,35 @@ export function StocksSection() {
               </li>
             ))}
           </ul>
+          {/* Cuadre de inversión: que aportes y compras no se desamarren */}
+          <div className={`mt-3 rounded-xl p-3 text-sm ${recon.brokerCash < -0.005 ? 'bg-amber-50 dark:bg-amber-950' : 'bg-slate-50 dark:bg-slate-800'}`}>
+            <p className="mb-1 font-semibold">🔗 Cuadre con tus aportes</p>
+            <div className="flex justify-between py-0.5"><span className="text-slate-500">Aportes anotados</span><span className="tabular-nums">{fmtMoney(app.totalInvested)}</span></div>
+            <div className="flex justify-between py-0.5"><span className="text-slate-500">− Compras de acciones</span><span className="tabular-nums">{fmtMoney(recon.buys)}</span></div>
+            {recon.proceeds > 0 && (
+              <div className="flex justify-between py-0.5"><span className="text-slate-500">+ Ventas</span><span className="tabular-nums">{fmtMoney(recon.proceeds)}</span></div>
+            )}
+            <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 font-semibold dark:border-slate-700">
+              <span>{recon.brokerCash >= -0.005 ? 'Sin invertir (efectivo en el broker)' : 'Discrepancia'}</span>
+              <span className={`tabular-nums ${recon.brokerCash < -0.005 ? 'text-amber-700 dark:text-amber-300' : ''}`}>{fmtMoney(recon.brokerCash)}</span>
+            </div>
+            {recon.brokerCash < -0.005 && (
+              <>
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                  Compraste {fmtMoney(-recon.brokerCash)} más de lo que has anotado como aporte.
+                  ¿Se te olvidó anotar un aporte, o registraste una compra de más?
+                </p>
+                <Button
+                  variant="secondary"
+                  className="mt-2 w-full"
+                  onClick={() => app.addInvestment(-recon.brokerCash, todayISO(), 'Ajuste: cuadre con acciones')}
+                >
+                  Anotar aporte de {fmtMoney(-recon.brokerCash)}
+                </Button>
+              </>
+            )}
+          </div>
+
           {sold.length > 0 && (
             <>
               <button className="mt-1 text-xs text-slate-400" onClick={() => setShowSold(!showSold)}>

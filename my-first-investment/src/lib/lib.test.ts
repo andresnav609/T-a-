@@ -471,6 +471,24 @@ describe('portafolio de acciones', () => {
     expect(pf.history.find((h) => h.date === '2025-09-09')).toBeUndefined();
   });
 
+  it('cuadre de inversión: aportes vs compras, con ventas que regresan al broker', async () => {
+    const { brokerReconciliation } = await import('./stocks');
+    // Aportaste 500; compraste 300 y 150; la de 150 la vendiste en 180.
+    const r = brokerReconciliation(500, [
+      pos({ amountInvested: 300 }),
+      pos({ id: 'p2', amountInvested: 150, shares: 1.5, soldDate: '2025-09-15', soldPrice: 120 }),
+    ]);
+    expect(r.buys).toBe(450);
+    expect(r.proceeds).toBe(180); // 1.5 × 120
+    expect(r.brokerCash).toBe(230); // 500 − 450 + 180
+  });
+
+  it('cuadre negativo = compraste más de lo aportado (discrepancia)', async () => {
+    const { brokerReconciliation } = await import('./stocks');
+    const r = brokerReconciliation(100, [pos({ amountInvested: 180 })]);
+    expect(r.brokerCash).toBe(-80);
+  });
+
   it('sin precios aún, la posición no inventa valor', async () => {
     const { buildPortfolio } = await import('./stocks');
     const pf = buildPortfolio([pos({ symbol: 'TSLA' })], prices);

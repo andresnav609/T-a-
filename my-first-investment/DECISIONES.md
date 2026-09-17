@@ -146,3 +146,8 @@ siempre la más simple (como pide el documento).
     "de tu bolsillo" vs "valor hoy" y no toca la cuenta de banco ni las
     predicciones. Ante fallo de un ticker, el robot conserva la serie
     anterior; la app cachea el último prices.json para funcionar offline.
+38. **Cuadre con aportes** (ronda 6b): en Mis acciones, la app compara los
+    aportes anotados (Total invertido) contra las compras de acciones:
+    aportes − compras + ventas = efectivo en el broker. Si da negativo
+    (compraste más de lo aportado) lo marca como discrepancia y ofrece
+    anotar el aporte faltante con un toque.

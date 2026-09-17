@@ -116,6 +116,26 @@ export function buildPortfolio(
   };
 }
 
+/** Cuadre de inversión: aportes anotados vs compras de acciones.
+ *  brokerCash = aportes − compras + ventas. Negativo = compraste más de lo
+ *  que anotaste como aporte (falta anotar un aporte, o sobró una compra). */
+export function brokerReconciliation(
+  totalContributed: number,
+  positions: StockPosition[],
+): { buys: number; proceeds: number; brokerCash: number } {
+  const buys = positions.reduce((s, p) => s + p.amountInvested, 0);
+  const proceeds = positions.reduce(
+    (s, p) => s + (p.soldDate && p.soldPrice != null ? p.shares * p.soldPrice : 0),
+    0,
+  );
+  const brokerCash = Math.round((totalContributed - buys + proceeds + Number.EPSILON) * 100) / 100;
+  return {
+    buys: Math.round((buys + Number.EPSILON) * 100) / 100,
+    proceeds: Math.round((proceeds + Number.EPSILON) * 100) / 100,
+    brokerCash,
+  };
+}
+
 export function parsePricesFile(json: string): PricesFile | null {
   try {
     const obj = JSON.parse(json);
